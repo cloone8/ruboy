@@ -1,6 +1,7 @@
 use cpu::Cpu;
 
-pub mod cpu;
+mod cpu;
+mod memcontroller;
 
 pub struct Gameboy {
     cpu: Cpu,
