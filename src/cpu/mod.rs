@@ -1,5 +1,4 @@
 mod registers;
-mod instructions;
 
 use registers::Registers;
 
