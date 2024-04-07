@@ -7,8 +7,8 @@ authors = ["Wouter de Bruijn <wouter@wutru.io>"]
 homepage = "https://github.com/cloone8/cpr_gameboy"
 repository = "https://github.com/cloone8/cpr_gameboy"
 license = "MPL-2.0"
-tags = ["gameboy", "emulation", "game", "library"]
-
+keywords = ["gameboy", "emulation", "game", "library"]
+categories = ["emulators"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
