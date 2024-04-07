@@ -72,9 +72,20 @@ pub(crate) enum IncDecTarget {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub(crate) enum Condition {
+    Zero,
+    NotZero,
+    Carry,
+    NotCarry
+}
+
+#[derive(Debug, Copy, Clone)]
 pub(crate) enum Instruction {
     /// No operation
     Nop,
+
+    /// Enter low power mode
+    Stop,
 
     /// Add value from source to register A, store result in A
     Add(ArithSrc),
@@ -103,6 +114,27 @@ pub(crate) enum Instruction {
     /// Load 16 bit value from source to destination
     Load16(Ld16Dst, Ld16Src),
 
+    /// Load value from A into address stored in HL, increment HL afterwards
+    LoadAtoHLI,
+
+    /// Load value from A into address stored in HL, decrement HL afterwards
+    LoadAtoHLD,
+
+    /// Load value from address stored in HL into A, increment HL afterwards
+    LoadHLItoA,
+
+    /// Load value from address stored in HL into A, decrement HL afterwards
+    LoadHLDtoA,
+
+    /// Jump to address
+    Jump(u16),
+
+    /// Jump to address stored in HL
+    JumlHL,
+
+    /// Jump to address if condition is met
+    JumpIf(u16, Condition),
+
     /// Illegal instruction, stop CPU
     IllegalInstruction(RawInstruction)
 }
@@ -115,6 +147,12 @@ pub enum DecodeError {
 macro_rules! not_yet_implemented {
     () => {
         return Err(DecodeError::NotYetImplemented)
+    };
+}
+
+macro_rules! reljump {
+    ($addr:expr, $mem:expr) => {
+        $addr.wrapping_add_signed($mem.read8($addr) as i8 as i16)
     };
 }
 
@@ -148,12 +186,43 @@ impl Instruction {
             0x0F => not_yet_implemented!(),
 
             // 0x1_
+            0x10 => Instruction::Stop,
+            0x11 => Instruction::Load16(Ld16Dst::Reg(Register16::DE), Ld16Src::Imm(mem.read16(pc + 1))),
+            0x12 => Instruction::Load8(Ld8Dst::Mem(MemLoc::Reg(Register16::DE)), Ld8Src::Reg(Register8::A)),
+            0x13 => Instruction::Inc(IncDecTarget::Reg16(Register16::DE)),
+            0x14 => Instruction::Inc(IncDecTarget::Reg8(Register8::D)),
+            0x15 => Instruction::Dec(IncDecTarget::Reg8(Register8::D)),
+            0x16 => Instruction::Load8(Ld8Dst::Reg(Register8::D), Ld8Src::Imm(mem.read8(pc + 1))),
+            0x17 => not_yet_implemented!(),
+            0x18 => Instruction::Jump(reljump!(pc + 1, mem)),
             0x19 => Instruction::AddHL(Register16::DE),
+            0x1A => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::Reg(Register16::DE))),
+            0x1B => Instruction::Dec(IncDecTarget::Reg16(Register16::DE)),
+            0x1C => Instruction::Inc(IncDecTarget::Reg8(Register8::E)),
+            0x1D => Instruction::Dec(IncDecTarget::Reg8(Register8::E)),
+            0x1E => Instruction::Load8(Ld8Dst::Reg(Register8::E), Ld8Src::Imm(mem.read8(pc + 1))),
+            0x1F => not_yet_implemented!(),
 
             // 0x2_
+            0x20 => Instruction::JumpIf(reljump!(pc + 1, mem), Condition::NotZero),
+            0x21 => Instruction::Load16(Ld16Dst::Reg(Register16::HL), Ld16Src::Imm(mem.read16(pc + 1))),
+            0x22 => Instruction::LoadAtoHLI,
+            0x23 => Instruction::Inc(IncDecTarget::Reg16(Register16::HL)),
+            0x24 => Instruction::Inc(IncDecTarget::Reg8(Register8::H)),
+            0x25 => Instruction::Dec(IncDecTarget::Reg8(Register8::H)),
+            0x26 => Instruction::Load8(Ld8Dst::Reg(Register8::H), Ld8Src::Imm(mem.read8(pc + 1))),
+            0x27 => not_yet_implemented!(),
+            0x28 => Instruction::JumpIf(reljump!(pc + 1, mem), Condition::Zero),
             0x29 => Instruction::AddHL(Register16::HL),
+            0x2A => Instruction::LoadHLItoA,
+            0x2B => Instruction::Dec(IncDecTarget::Reg16(Register16::HL)),
+            0x2C => Instruction::Inc(IncDecTarget::Reg8(Register8::L)),
+            0x2D => Instruction::Dec(IncDecTarget::Reg8(Register8::L)),
+            0x2E => Instruction::Load8(Ld8Dst::Reg(Register8::L), Ld8Src::Imm(mem.read8(pc + 1))),
+            0x2F => not_yet_implemented!(),
 
             // 0x3_
+            0x32 => Instruction::LoadAtoHLD,
             0x39 => Instruction::AddHL(Register16::SP),
 
             // 0x8_
