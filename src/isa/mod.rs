@@ -21,6 +21,7 @@ pub enum Register8 {
 
 #[derive(Debug, Copy, Clone)]
 pub enum Register16 {
+    AF,
     BC,
     DE,
     HL,
@@ -29,7 +30,11 @@ pub enum Register16 {
 
 #[derive(Debug, Copy, Clone)]
 pub enum MemLoc {
+    /// 0xFF00 + u8
+    HighMemReg(Register8),
     Reg(Register16),
+    /// 0xFF00 + u8
+    HighMemImm(u8),
     Imm(u16)
 }
 
@@ -65,6 +70,15 @@ pub enum Ld16Dst {
     Reg(Register16)
 }
 
+    
+#[derive(Debug, Copy, Clone)]
+pub enum LdHOperand {
+    RegA,
+    Mem(u16),
+    // 0xFFu8
+    MemFF00(u8),
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum IncDecTarget {
     Reg8(Register8),
@@ -91,6 +105,12 @@ pub enum Instruction {
     /// Enter low power mode until interrupt
     Halt,
 
+    /// Enable interrupts _after_ instruction following this one by setting IME
+    EI,
+
+    /// Disable interrupts by clearing IME
+    DI,
+
     /// Add value from source to register A, store result in A
     Add(ArithSrc),
 
@@ -99,6 +119,9 @@ pub enum Instruction {
 
     /// Add value from source to register HL, store result in HL
     AddHL(Register16),
+
+    /// Add signed value to SP
+    AddSP(i8),
 
     /// Subtract value from source from register A, store result in A
     Sub(ArithSrc),
@@ -142,6 +165,9 @@ pub enum Instruction {
     /// Load value from address stored in HL into A, decrement HL afterwards
     LoadHLDtoA,
 
+    /// Add SP to signed immediate value, store result in HL
+    LoadSPi8toHL(i8),
+    
     /// Jump to address
     Jump(u16),
 
@@ -149,7 +175,7 @@ pub enum Instruction {
     JumpRel(i8),
 
     /// Jump to address stored in HL
-    JumlHL,
+    JumpHL,
 
     /// Jump to address if condition is met
     JumpIf(u16, Condition),
@@ -178,6 +204,6 @@ pub enum Instruction {
     /// Push value from register onto stack
     Push(Register16),
 
-    /// Illegal instruction, stop CPU
-    IllegalInstruction(RawInstruction)
+    /// Illegal instruction, stop CPU. Opcode is provided for debugging
+    IllegalInstruction(u8)
 }

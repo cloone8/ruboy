@@ -2,7 +2,7 @@
     
 use crate::{isa::{ArithSrc, Condition, IncDecTarget, Instruction, Ld16Dst, Ld16Src, Ld8Dst, Ld8Src, MemLoc, Register16, Register8}, memcontroller::MemController};
 
-use super::RawInstruction;
+use super::{LdHOperand, RawInstruction};
 
 #[derive(Debug)]
 pub enum DecodeError {
@@ -12,6 +12,12 @@ pub enum DecodeError {
 macro_rules! err_not_yet_impl {
     () => {
         return Err(DecodeError::NotYetImplemented)
+    };
+}
+
+macro_rules! illegal {
+    ($opcode:expr) => {
+        Instruction::IllegalInstruction($opcode)
     };
 }
 
@@ -329,7 +335,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xD0 => Instruction::RetIf(Condition::NotCarry),
         0xD1 => Instruction::Pop(Register16::DE),
         0xD2 => Instruction::JumpIf(mem.read16(pc + 1), Condition::NotCarry),
-        0xD3 => Instruction::IllegalInstruction(RawInstruction::Single(0xD3)),
+        0xD3 => illegal!(0xD3),
         0xD4 => Instruction::CallIf(mem.read16(pc + 1), Condition::NotCarry),
         0xD5 => Instruction::Push(Register16::DE),
         0xD6 => Instruction::Sub(ArithSrc::Imm(mem.read8(pc + 1))),
@@ -337,17 +343,47 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xD8 => Instruction::RetIf(Condition::Carry),
         0xD9 => Instruction::Reti,
         0xDA => Instruction::JumpIf(mem.read16(pc + 1), Condition::Carry),
-        0xDB => Instruction::IllegalInstruction(RawInstruction::Single(0xDB)),
+        0xDB => illegal!(0xDB),
         0xDC => Instruction::CallIf(mem.read16(pc + 1), Condition::Carry),
-        0xDD => Instruction::IllegalInstruction(RawInstruction::Single(0xDD)),
+        0xDD => illegal!(0xDD),
         0xDE => Instruction::SubCarry(ArithSrc::Imm(mem.read8(pc + 1))),
         0xDF => err_not_yet_impl!(),
 
         // 0xE_
+        0xE0 => Instruction::Load8(Ld8Dst::Mem(MemLoc::HighMemImm(mem.read8(pc + 1))), Ld8Src::Reg(Register8::A)),
+        0xE1 => Instruction::Pop(Register16::HL),
+        0xE2 => Instruction::Load8(Ld8Dst::Mem(MemLoc::HighMemReg(Register8::C)), Ld8Src::Reg(Register8::A)),
+        0xE3 => illegal!(0xE3),
+        0xE4 => illegal!(0xE4),
+        0xE5 => Instruction::Push(Register16::HL),
+        0xE6 => Instruction::And(ArithSrc::Imm(mem.read8(pc + 1))),
+        0xE7 => err_not_yet_impl!(),
+        0xE8 => Instruction::AddSP(mem.read8(pc + 1) as i8),
+        0xE9 => Instruction::JumpHL,
+        0xEA => Instruction::Load8(Ld8Dst::Mem(MemLoc::Imm(mem.read16(pc + 1))), Ld8Src::Reg(Register8::A)),
+        0xEB => illegal!(0xEB),
+        0xEC => illegal!(0xEC),
+        0xED => illegal!(0xED),
+        0xEE => Instruction::Xor(ArithSrc::Imm(mem.read8(pc + 1))),
+        0xEF => err_not_yet_impl!(),
 
         // 0xF_
-
-        _ => err_not_yet_impl!()
+        0xF0 => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::HighMemImm(mem.read8(pc + 1)))),
+        0xF1 => Instruction::Pop(Register16::AF),
+        0xF2 => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::HighMemReg(Register8::C))),
+        0xF3 => Instruction::DI,
+        0xF4 => illegal!(0xF4),
+        0xF5 => Instruction::Push(Register16::AF),
+        0xF6 => Instruction::Or(ArithSrc::Imm(mem.read8(pc + 1))),
+        0xF7 => err_not_yet_impl!(),
+        0xF8 => Instruction::LoadSPi8toHL(mem.read8(pc + 1) as i8),
+        0xF9 => Instruction::Load16(Ld16Dst::Reg(Register16::SP), Ld16Src::Reg(Register16::HL)),
+        0xFA => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::Imm(mem.read16(pc + 1)))),
+        0xFB => Instruction::EI,
+        0xFC => illegal!(0xFC),
+        0xFD => illegal!(0xFD),
+        0xFE => Instruction::Cmp(ArithSrc::Imm(mem.read8(pc + 1))),
+        0xFF => err_not_yet_impl!(),
     };
 
     Ok(instr)
