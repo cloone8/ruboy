@@ -2,12 +2,6 @@
 pub mod decoder;
 
 #[derive(Debug, Copy, Clone)]
-pub enum RawInstruction {
-    Single(u8),
-    Double(u16)
-}
-
-#[derive(Debug, Copy, Clone)]
 pub enum Register8 {
     A,
     B,
@@ -68,15 +62,6 @@ pub enum Ld16Src {
 pub enum Ld16Dst {
     Mem(MemLoc),
     Reg(Register16)
-}
-
-    
-#[derive(Debug, Copy, Clone)]
-pub enum LdHOperand {
-    RegA,
-    Mem(u16),
-    // 0xFFu8
-    MemFF00(u8),
 }
 
 #[derive(Debug, Copy, Clone)]

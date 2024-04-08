@@ -2,7 +2,7 @@
     
 use crate::{isa::{ArithSrc, Condition, IncDecTarget, Instruction, Ld16Dst, Ld16Src, Ld8Dst, Ld8Src, MemLoc, Register16, Register8}, memcontroller::MemController};
 
-use super::{Bit, LdHOperand, PrefArithTarget, RawInstruction};
+use super::{Bit, PrefArithTarget};
 
 #[derive(Debug)]
 pub enum DecodeError {

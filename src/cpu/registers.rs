@@ -120,55 +120,61 @@ impl Registers {
     }
 }
 
+macro_rules! get_flag {
+    ($bit:literal, $from:ident) => {
+        {
+            static_assertions::const_assert!($bit >= 0);
+            static_assertions::const_assert!($bit < 8);
+
+            $from.f & (1 << $bit) != 0
+        }
+    };
+}
+
+macro_rules! set_flag {
+    ($bit:literal, $value:expr, $from:ident) => {
+        static_assertions::const_assert!($bit >= 0);
+        static_assertions::const_assert!($bit < 8);
+
+        if $value {
+            $from.f |= 1 << $bit;
+        } else {
+            $from.f &= !(1 << $bit)
+        }
+    };
+}
+
 /// Flag register operations
 impl Registers {
-    // TODO: Convert to macro?
-    const fn get_flag<const BIT: u8>(&self) -> bool {
-        debug_assert!(BIT < 8);
-
-        self.f & (1 << BIT) != 0
-    }
-
-    // TODO: Convert to macro?
-    fn set_flag<const BIT: u8>(&mut self, value: bool) {
-        debug_assert!(BIT < 8);
-
-        if value {
-            self.f |= 1 << BIT;
-        } else {
-            self.f &= !(1 << BIT)
-        }
-    }
-
     pub const fn zero_flag(&self) -> bool {
-        self.get_flag::<7>()
+       get_flag!(7, self)
     }
 
     pub fn set_zero_flag(&mut self, value: bool) {
-        self.set_flag::<7>(value);
+        set_flag!(7, value, self);
     }
 
     pub const fn subtract_flag(&self) -> bool {
-        self.get_flag::<6>()
+        get_flag!(6, self)
     }
 
     pub fn set_subtract_flag(&mut self, value: bool) {
-        self.set_flag::<6>(value);
+        set_flag!(6, value, self);
     }
 
     pub const fn half_carry_flag(&self) -> bool {
-        self.get_flag::<5>()
+        get_flag!(5, self)
     }
 
     pub fn set_half_carry_flag(&mut self, value: bool) {
-        self.set_flag::<5>(value);
+        set_flag!(5, value, self);
     }
 
     pub const fn carry_flag(&self) -> bool {
-        self.get_flag::<4>()
+        get_flag!(4, self)
     }
 
     pub fn set_carry_flag(&mut self, value: bool) {
-        self.set_flag::<4>(value);
+        set_flag!(4, value, self);
     }
 }
