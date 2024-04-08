@@ -15,12 +15,6 @@ macro_rules! err_not_yet_impl {
     };
 }
 
-macro_rules! reljump {
-    ($addr:expr, $mem:expr) => {
-        $addr.wrapping_add_signed($mem.read8($addr) as i8 as i16)
-    };
-}
-
 macro_rules! ld_regs {
     ($dst:ident, $src:ident) => {
         Instruction::Load8(Ld8Dst::Reg(Register8::$dst), Ld8Src::Reg(Register8::$src))
@@ -123,7 +117,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x15 => Instruction::Dec(IncDecTarget::Reg8(Register8::D)),
         0x16 => Instruction::Load8(Ld8Dst::Reg(Register8::D), Ld8Src::Imm(mem.read8(pc + 1))),
         0x17 => err_not_yet_impl!(),
-        0x18 => Instruction::Jump(reljump!(pc + 1, mem)),
+        0x18 => Instruction::JumpRel(mem.read8(pc + 1) as i8),
         0x19 => Instruction::AddHL(Register16::DE),
         0x1A => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::Reg(Register16::DE))),
         0x1B => Instruction::Dec(IncDecTarget::Reg16(Register16::DE)),
@@ -133,7 +127,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x1F => err_not_yet_impl!(),
 
         // 0x2_
-        0x20 => Instruction::JumpIf(reljump!(pc + 1, mem), Condition::NotZero),
+        0x20 => Instruction::JumpRelIf(mem.read8(pc + 1) as i8, Condition::NotZero),
         0x21 => Instruction::Load16(Ld16Dst::Reg(Register16::HL), Ld16Src::Imm(mem.read16(pc + 1))),
         0x22 => Instruction::LoadAtoHLI,
         0x23 => Instruction::Inc(IncDecTarget::Reg16(Register16::HL)),
@@ -141,7 +135,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x25 => Instruction::Dec(IncDecTarget::Reg8(Register8::H)),
         0x26 => Instruction::Load8(Ld8Dst::Reg(Register8::H), Ld8Src::Imm(mem.read8(pc + 1))),
         0x27 => err_not_yet_impl!(),
-        0x28 => Instruction::JumpIf(reljump!(pc + 1, mem), Condition::Zero),
+        0x28 => Instruction::JumpRelIf(mem.read8(pc + 1) as i8, Condition::Zero),
         0x29 => Instruction::AddHL(Register16::HL),
         0x2A => Instruction::LoadHLItoA,
         0x2B => Instruction::Dec(IncDecTarget::Reg16(Register16::HL)),
@@ -151,7 +145,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x2F => err_not_yet_impl!(),
 
         // 0x3_
-        0x30 => Instruction::JumpIf(reljump!(pc + 1, mem), Condition::NotCarry),
+        0x30 => Instruction::JumpRelIf(mem.read8(pc + 1) as i8, Condition::NotCarry),
         0x31 => Instruction::Load16(Ld16Dst::Reg(Register16::SP), Ld16Src::Imm(mem.read16(pc + 1))),
         0x32 => Instruction::LoadAtoHLD,
         0x33 => Instruction::Inc(IncDecTarget::Reg16(Register16::SP)),
@@ -159,7 +153,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x35 => Instruction::Dec(IncDecTarget::Mem(MemLoc::Reg(Register16::HL))),
         0x36 => Instruction::Load8(Ld8Dst::Mem(MemLoc::Reg(Register16::HL)), Ld8Src::Imm(mem.read8(pc + 1))),
         0x37 => err_not_yet_impl!(),
-        0x38 => Instruction::JumpIf(reljump!(pc + 1, mem), Condition::Carry),
+        0x38 => Instruction::JumpRelIf(mem.read8(pc + 1) as i8, Condition::Carry),
         0x39 => Instruction::AddHL(Register16::SP),
         0x3A => Instruction::LoadHLDtoA,
         0x3B => Instruction::Dec(IncDecTarget::Reg16(Register16::SP)),

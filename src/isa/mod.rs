@@ -145,11 +145,17 @@ pub enum Instruction {
     /// Jump to address
     Jump(u16),
 
+    /// Jump to relative address
+    JumpRel(i8),
+
     /// Jump to address stored in HL
     JumlHL,
 
     /// Jump to address if condition is met
     JumpIf(u16, Condition),
+    
+    /// Jump to relative address if condition is met
+    JumpRelIf(i8, Condition),
 
     /// Call subroutine at address
     Call(u16),
