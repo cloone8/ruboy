@@ -87,6 +87,26 @@ pub enum IncDecTarget {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub enum PrefArithTarget {
+    Reg(Register8),
+    
+    /// Memory location in HL
+    MemHL
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Bit {
+    B0 = 0,
+    B1 = 1,
+    B2 = 2,
+    B3 = 3,
+    B4 = 4,
+    B5 = 5,
+    B6 = 6,
+    B7 = 7
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum Condition {
     Zero,
     NotZero,
@@ -146,6 +166,39 @@ pub enum Instruction {
 
     /// Decrement value at target
     Dec(IncDecTarget),
+
+    /// Rotate left
+    RotLeftCarry(PrefArithTarget),
+
+    /// Rotate right
+    RotRightCarry(PrefArithTarget),
+
+    /// Rotate left through carry
+    RotLeft(PrefArithTarget),
+
+    /// Rotate right through carry
+    RotRight(PrefArithTarget),
+
+    /// Shift left arithmetically
+    ShiftLeftArith(PrefArithTarget),
+
+    /// Shift right arithmetically
+    ShiftRightArith(PrefArithTarget),
+
+    /// Swap upper and lower 4 bits
+    Swap(PrefArithTarget),
+
+    /// Shift right locically
+    ShiftRightLogic(PrefArithTarget),
+
+    /// Set zero flag if bit is 0
+    Bit(Bit, PrefArithTarget),
+
+    /// Set bit to 0 (RESET)
+    Res(Bit, PrefArithTarget),
+
+    /// Set bit to 1 (SET)
+    Set(Bit, PrefArithTarget),
 
     /// Load 8 bit value from source to destination
     Load8(Ld8Dst, Ld8Src),
