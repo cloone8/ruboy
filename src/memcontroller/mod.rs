@@ -1,35 +1,39 @@
-pub struct GBMemController {
+pub struct InlineGBRam {
     mem: [u8; 0xFFFF],
 }
 
-impl GBMemController {
-    pub fn new() -> GBMemController {
-        GBMemController { mem: [0; 0xFFFF] }
+impl InlineGBRam {
+    pub fn new() -> InlineGBRam {
+        InlineGBRam { mem: [0; 0xFFFF] }
     }
 }
 
-pub struct BoxedGBMemController {
+pub struct BoxedGBRam {
     mem: Box<[u8; 0xFFFF]>,
 }
 
-impl BoxedGBMemController {
-    pub fn new() -> BoxedGBMemController {
-        BoxedGBMemController {
+impl BoxedGBRam {
+    pub fn new() -> BoxedGBRam {
+        BoxedGBRam {
             mem: Box::new([0; 0xFFFF]),
         }
     }
 }
 
-pub trait MemController {
+pub struct MemController<T: GBRam> {
+    ram: T,
+}
+
+pub trait GBRam {
     fn read8(&self, addr: u16) -> u8;
     fn read16(&self, addr: u16) -> u16;
     fn write8(&mut self, addr: u16, value: u8);
     fn write16(&mut self, addr: u16, value: u16);
 }
 
-macro_rules! impl_basic_memcontroller {
+macro_rules! impl_basic_ram {
     ($name:ident) => {
-        impl MemController for $name {
+        impl GBRam for $name {
             fn read8(&self, addr: u16) -> u8 {
                 self.mem[addr as usize]
             }
@@ -55,5 +59,5 @@ macro_rules! impl_basic_memcontroller {
     };
 }
 
-impl_basic_memcontroller!(GBMemController);
-impl_basic_memcontroller!(BoxedGBMemController);
+impl_basic_ram!(InlineGBRam);
+impl_basic_ram!(BoxedGBRam);

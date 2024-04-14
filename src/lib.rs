@@ -1,14 +1,14 @@
 use cpu::Cpu;
-use memcontroller::MemController;
+use memcontroller::{GBRam, MemController};
 
 mod cpu;
 pub mod isa;
 mod memcontroller;
 
-pub struct Gameboy<M>
+pub struct Gameboy<R>
 where
-    M: MemController,
+    R: GBRam,
 {
     cpu: Cpu,
-    mem: M,
+    mem: MemController<R>,
 }

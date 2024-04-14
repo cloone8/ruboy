@@ -1,7 +1,7 @@
 pub mod decoder;
 
 #[derive(Debug, Copy, Clone)]
-pub enum Register8 {
+pub enum Reg8 {
     A,
     B,
     C,
@@ -13,7 +13,7 @@ pub enum Register8 {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum Register16 {
+pub enum Reg16 {
     AF,
     BC,
     DE,
@@ -24,8 +24,8 @@ pub enum Register16 {
 #[derive(Debug, Copy, Clone)]
 pub enum MemLoc {
     /// 0xFF00 + u8
-    HighMemReg(Register8),
-    Reg(Register16),
+    HighMemReg(Reg8),
+    Reg(Reg16),
     /// 0xFF00 + u8
     HighMemImm(u8),
     Imm(u16),
@@ -33,14 +33,14 @@ pub enum MemLoc {
 
 #[derive(Debug, Copy, Clone)]
 pub enum ArithSrc {
-    Reg(Register8),
+    Reg(Reg8),
     Imm(u8),
     Mem(MemLoc),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum Ld8Src {
-    Reg(Register8),
+    Reg(Reg8),
     Mem(MemLoc),
     Imm(u8),
 }
@@ -48,31 +48,31 @@ pub enum Ld8Src {
 #[derive(Debug, Copy, Clone)]
 pub enum Ld8Dst {
     Mem(MemLoc),
-    Reg(Register8),
+    Reg(Reg8),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum Ld16Src {
-    Reg(Register16),
+    Reg(Reg16),
     Imm(u16),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum Ld16Dst {
     Mem(MemLoc),
-    Reg(Register16),
+    Reg(Reg16),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum IncDecTarget {
-    Reg8(Register8),
-    Reg16(Register16),
+    Reg8(Reg8),
+    Reg16(Reg16),
     Mem(MemLoc),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum PrefArithTarget {
-    Reg(Register8),
+    Reg(Reg8),
 
     /// Memory location in HL
     MemHL,
@@ -134,7 +134,7 @@ pub enum Instruction {
     AddCarry(ArithSrc),
 
     /// Add value from source to register HL, store result in HL
-    AddHL(Register16),
+    AddHL(Reg16),
 
     /// Add signed value to SP
     AddSP(i8),
@@ -248,10 +248,10 @@ pub enum Instruction {
     RetIf(Condition),
 
     /// Pop value from stack into register
-    Pop(Register16),
+    Pop(Reg16),
 
     /// Push value from register onto stack
-    Push(Register16),
+    Push(Reg16),
 
     /// Decimal Adjust Accumulator to get correct BCD representation after an arithmetic
     /// instruction
