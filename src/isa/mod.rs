@@ -100,6 +100,18 @@ pub enum Condition {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub enum RsVec {
+    Rst0 = 0x00,
+    Rst1 = 0x08,
+    Rst2 = 0x10,
+    Rst3 = 0x18,
+    Rst4 = 0x20,
+    Rst5 = 0x28,
+    Rst6 = 0x30,
+    Rst7 = 0x38
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum Instruction {
     /// No operation
     Nop,
@@ -241,6 +253,23 @@ pub enum Instruction {
 
     /// Push value from register onto stack
     Push(Register16),
+
+    /// Decimal Adjust Accumulator to get correct BCD representation after an arithmetic
+    /// instruction
+    /// TODO: What does that actually mean
+    DecimalAdjust,
+
+    /// Complement A (A = ~A)
+    ComplementAccumulator,
+
+    /// Set carry flag to 1
+    SetCarryFlag,
+    
+    /// Inverts carry flag
+    ComplementCarry,
+
+    /// Call address contained in this instruction.
+    Rst(RsVec),
 
     /// Illegal instruction, stop CPU. Opcode is provided for debugging
     IllegalInstruction(u8)

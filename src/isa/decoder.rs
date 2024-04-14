@@ -2,17 +2,11 @@
     
 use crate::{isa::{ArithSrc, Condition, IncDecTarget, Instruction, Ld16Dst, Ld16Src, Ld8Dst, Ld8Src, MemLoc, Register16, Register8}, memcontroller::MemController};
 
-use super::{Bit, PrefArithTarget};
+use super::{Bit, PrefArithTarget, RsVec};
 
 #[derive(Debug)]
 pub enum DecodeError {
     NotYetImplemented,
-}
-
-macro_rules! err_not_yet_impl {
-    () => {
-        return Err(DecodeError::NotYetImplemented)
-    };
 }
 
 macro_rules! illegal {
@@ -363,7 +357,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x04 => Instruction::Inc(IncDecTarget::Reg8(Register8::B)),
         0x05 => Instruction::Dec(IncDecTarget::Reg8(Register8::B)),
         0x06 => Instruction::Load8(Ld8Dst::Reg(Register8::C), Ld8Src::Imm(mem.read8(pc + 1))),
-        0x07 => err_not_yet_impl!(),
+        0x07 => Instruction::RotLeftCarry(PrefArithTarget::Reg(Register8::A)),
         0x08 => Instruction::Load16(Ld16Dst::Mem(MemLoc::Imm(mem.read16(pc + 1))), Ld16Src::Reg(Register16::SP)),
         0x09 => Instruction::AddHL(Register16::BC),
         0x0A => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::Reg(Register16::BC))),
@@ -371,7 +365,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x0C => Instruction::Inc(IncDecTarget::Reg8(Register8::C)),
         0x0D => Instruction::Dec(IncDecTarget::Reg8(Register8::C)),
         0x0E => Instruction::Load8(Ld8Dst::Reg(Register8::C), Ld8Src::Imm(mem.read8(pc + 1))),
-        0x0F => err_not_yet_impl!(),
+        0x0F => Instruction::RotRightCarry(PrefArithTarget::Reg(Register8::A)),
 
         // 0x1_
         0x10 => Instruction::Stop,
@@ -381,7 +375,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x14 => Instruction::Inc(IncDecTarget::Reg8(Register8::D)),
         0x15 => Instruction::Dec(IncDecTarget::Reg8(Register8::D)),
         0x16 => Instruction::Load8(Ld8Dst::Reg(Register8::D), Ld8Src::Imm(mem.read8(pc + 1))),
-        0x17 => err_not_yet_impl!(),
+        0x17 => Instruction::RotLeft(PrefArithTarget::Reg(Register8::A)),
         0x18 => Instruction::JumpRel(mem.read8(pc + 1) as i8),
         0x19 => Instruction::AddHL(Register16::DE),
         0x1A => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::Reg(Register16::DE))),
@@ -389,7 +383,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x1C => Instruction::Inc(IncDecTarget::Reg8(Register8::E)),
         0x1D => Instruction::Dec(IncDecTarget::Reg8(Register8::E)),
         0x1E => Instruction::Load8(Ld8Dst::Reg(Register8::E), Ld8Src::Imm(mem.read8(pc + 1))),
-        0x1F => err_not_yet_impl!(),
+        0x1F => Instruction::RotRight(PrefArithTarget::Reg(Register8::A)),
 
         // 0x2_
         0x20 => Instruction::JumpRelIf(mem.read8(pc + 1) as i8, Condition::NotZero),
@@ -399,7 +393,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x24 => Instruction::Inc(IncDecTarget::Reg8(Register8::H)),
         0x25 => Instruction::Dec(IncDecTarget::Reg8(Register8::H)),
         0x26 => Instruction::Load8(Ld8Dst::Reg(Register8::H), Ld8Src::Imm(mem.read8(pc + 1))),
-        0x27 => err_not_yet_impl!(),
+        0x27 => Instruction::DecimalAdjust,
         0x28 => Instruction::JumpRelIf(mem.read8(pc + 1) as i8, Condition::Zero),
         0x29 => Instruction::AddHL(Register16::HL),
         0x2A => Instruction::LoadHLItoA,
@@ -407,7 +401,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x2C => Instruction::Inc(IncDecTarget::Reg8(Register8::L)),
         0x2D => Instruction::Dec(IncDecTarget::Reg8(Register8::L)),
         0x2E => Instruction::Load8(Ld8Dst::Reg(Register8::L), Ld8Src::Imm(mem.read8(pc + 1))),
-        0x2F => err_not_yet_impl!(),
+        0x2F => Instruction::ComplementAccumulator, 
 
         // 0x3_
         0x30 => Instruction::JumpRelIf(mem.read8(pc + 1) as i8, Condition::NotCarry),
@@ -417,7 +411,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x34 => Instruction::Inc(IncDecTarget::Mem(MemLoc::Reg(Register16::HL))),
         0x35 => Instruction::Dec(IncDecTarget::Mem(MemLoc::Reg(Register16::HL))),
         0x36 => Instruction::Load8(Ld8Dst::Mem(MemLoc::Reg(Register16::HL)), Ld8Src::Imm(mem.read8(pc + 1))),
-        0x37 => err_not_yet_impl!(),
+        0x37 => Instruction::SetCarryFlag, 
         0x38 => Instruction::JumpRelIf(mem.read8(pc + 1) as i8, Condition::Carry),
         0x39 => Instruction::AddHL(Register16::SP),
         0x3A => Instruction::LoadHLDtoA,
@@ -425,7 +419,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0x3C => Instruction::Inc(IncDecTarget::Reg8(Register8::A)),
         0x3D => Instruction::Dec(IncDecTarget::Reg8(Register8::A)),
         0x3E => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Imm(mem.read8(pc + 1))),
-        0x3F => err_not_yet_impl!(),
+        0x3F => Instruction::ComplementCarry, 
 
         // 0x4_
         0x40 => ld_regs!(B, B),
@@ -580,7 +574,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xC4 => Instruction::CallIf(mem.read16(pc + 1), Condition::NotZero),
         0xC5 => Instruction::Push(Register16::BC),
         0xC6 => Instruction::Add(ArithSrc::Imm(mem.read8(pc + 1))),
-        0xC7 => err_not_yet_impl!(),
+        0xC7 => Instruction::Rst(RsVec::Rst0),
         0xC8 => Instruction::RetIf(Condition::Zero),
         0xC9 => Instruction::Ret,
         0xCA => Instruction::JumpIf(mem.read16(pc + 1), Condition::Zero),
@@ -588,7 +582,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xCC => Instruction::CallIf(mem.read16(pc + 1), Condition::Zero),
         0xCD => Instruction::Call(mem.read16(pc + 1)),
         0xCE => Instruction::AddCarry(ArithSrc::Imm(mem.read8(pc + 1))),
-        0xCF => err_not_yet_impl!(),
+        0xCF => Instruction::Rst(RsVec::Rst1),
 
         // 0xD_
         0xD0 => Instruction::RetIf(Condition::NotCarry),
@@ -598,7 +592,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xD4 => Instruction::CallIf(mem.read16(pc + 1), Condition::NotCarry),
         0xD5 => Instruction::Push(Register16::DE),
         0xD6 => Instruction::Sub(ArithSrc::Imm(mem.read8(pc + 1))),
-        0xD7 => err_not_yet_impl!(),
+        0xD7 => Instruction::Rst(RsVec::Rst2),
         0xD8 => Instruction::RetIf(Condition::Carry),
         0xD9 => Instruction::Reti,
         0xDA => Instruction::JumpIf(mem.read16(pc + 1), Condition::Carry),
@@ -606,7 +600,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xDC => Instruction::CallIf(mem.read16(pc + 1), Condition::Carry),
         0xDD => illegal!(0xDD),
         0xDE => Instruction::SubCarry(ArithSrc::Imm(mem.read8(pc + 1))),
-        0xDF => err_not_yet_impl!(),
+        0xDF => Instruction::Rst(RsVec::Rst3),
 
         // 0xE_
         0xE0 => Instruction::Load8(Ld8Dst::Mem(MemLoc::HighMemImm(mem.read8(pc + 1))), Ld8Src::Reg(Register8::A)),
@@ -616,7 +610,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xE4 => illegal!(0xE4),
         0xE5 => Instruction::Push(Register16::HL),
         0xE6 => Instruction::And(ArithSrc::Imm(mem.read8(pc + 1))),
-        0xE7 => err_not_yet_impl!(),
+        0xE7 => Instruction::Rst(RsVec::Rst4),
         0xE8 => Instruction::AddSP(mem.read8(pc + 1) as i8),
         0xE9 => Instruction::JumpHL,
         0xEA => Instruction::Load8(Ld8Dst::Mem(MemLoc::Imm(mem.read16(pc + 1))), Ld8Src::Reg(Register8::A)),
@@ -624,7 +618,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xEC => illegal!(0xEC),
         0xED => illegal!(0xED),
         0xEE => Instruction::Xor(ArithSrc::Imm(mem.read8(pc + 1))),
-        0xEF => err_not_yet_impl!(),
+        0xEF => Instruction::Rst(RsVec::Rst5),
 
         // 0xF_
         0xF0 => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::HighMemImm(mem.read8(pc + 1)))),
@@ -634,7 +628,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xF4 => illegal!(0xF4),
         0xF5 => Instruction::Push(Register16::AF),
         0xF6 => Instruction::Or(ArithSrc::Imm(mem.read8(pc + 1))),
-        0xF7 => err_not_yet_impl!(),
+        0xF7 => Instruction::Rst(RsVec::Rst6),
         0xF8 => Instruction::LoadSPi8toHL(mem.read8(pc + 1) as i8),
         0xF9 => Instruction::Load16(Ld16Dst::Reg(Register16::SP), Ld16Src::Reg(Register16::HL)),
         0xFA => Instruction::Load8(Ld8Dst::Reg(Register8::A), Ld8Src::Mem(MemLoc::Imm(mem.read16(pc + 1)))),
@@ -642,7 +636,7 @@ pub fn decode(mem: &impl MemController, pc: u16) -> Result<Instruction, DecodeEr
         0xFC => illegal!(0xFC),
         0xFD => illegal!(0xFD),
         0xFE => Instruction::Cmp(ArithSrc::Imm(mem.read8(pc + 1))),
-        0xFF => err_not_yet_impl!(),
+        0xFF => Instruction::Rst(RsVec::Rst7)
     };
 
     Ok(instr)
