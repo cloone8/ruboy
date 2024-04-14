@@ -1,23 +1,21 @@
 pub struct GBMemController {
-    mem: [u8; 0xFFFF]
+    mem: [u8; 0xFFFF],
 }
 
 impl GBMemController {
     pub fn new() -> GBMemController {
-        GBMemController {
-            mem: [0; 0xFFFF]
-        }
+        GBMemController { mem: [0; 0xFFFF] }
     }
 }
 
 pub struct BoxedGBMemController {
-    mem: Box<[u8; 0xFFFF]>
+    mem: Box<[u8; 0xFFFF]>,
 }
 
 impl BoxedGBMemController {
     pub fn new() -> BoxedGBMemController {
         BoxedGBMemController {
-            mem: Box::new([0; 0xFFFF])
+            mem: Box::new([0; 0xFFFF]),
         }
     }
 }

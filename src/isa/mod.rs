@@ -1,4 +1,3 @@
-
 pub mod decoder;
 
 #[derive(Debug, Copy, Clone)]
@@ -19,7 +18,7 @@ pub enum Register16 {
     BC,
     DE,
     HL,
-    SP
+    SP,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -29,14 +28,14 @@ pub enum MemLoc {
     Reg(Register16),
     /// 0xFF00 + u8
     HighMemImm(u8),
-    Imm(u16)
+    Imm(u16),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum ArithSrc {
     Reg(Register8),
     Imm(u8),
-    Mem(MemLoc)
+    Mem(MemLoc),
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -49,7 +48,7 @@ pub enum Ld8Src {
 #[derive(Debug, Copy, Clone)]
 pub enum Ld8Dst {
     Mem(MemLoc),
-    Reg(Register8)
+    Reg(Register8),
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -61,22 +60,22 @@ pub enum Ld16Src {
 #[derive(Debug, Copy, Clone)]
 pub enum Ld16Dst {
     Mem(MemLoc),
-    Reg(Register16)
+    Reg(Register16),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum IncDecTarget {
     Reg8(Register8),
     Reg16(Register16),
-    Mem(MemLoc)
+    Mem(MemLoc),
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum PrefArithTarget {
     Reg(Register8),
-    
+
     /// Memory location in HL
-    MemHL
+    MemHL,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -88,7 +87,7 @@ pub enum Bit {
     B4 = 4,
     B5 = 5,
     B6 = 6,
-    B7 = 7
+    B7 = 7,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -96,7 +95,7 @@ pub enum Condition {
     Zero,
     NotZero,
     Carry,
-    NotCarry
+    NotCarry,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -108,7 +107,7 @@ pub enum RsVec {
     Rst4 = 0x20,
     Rst5 = 0x28,
     Rst6 = 0x30,
-    Rst7 = 0x38
+    Rst7 = 0x38,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -217,7 +216,7 @@ pub enum Instruction {
 
     /// Add SP to signed immediate value, store result in HL
     LoadSPi8toHL(i8),
-    
+
     /// Jump to address
     Jump(u16),
 
@@ -229,7 +228,7 @@ pub enum Instruction {
 
     /// Jump to address if condition is met
     JumpIf(u16, Condition),
-    
+
     /// Jump to relative address if condition is met
     JumpRelIf(i8, Condition),
 
@@ -264,7 +263,7 @@ pub enum Instruction {
 
     /// Set carry flag to 1
     SetCarryFlag,
-    
+
     /// Inverts carry flag
     ComplementCarry,
 
@@ -272,5 +271,5 @@ pub enum Instruction {
     Rst(RsVec),
 
     /// Illegal instruction, stop CPU. Opcode is provided for debugging
-    IllegalInstruction(u8)
+    IllegalInstruction(u8),
 }

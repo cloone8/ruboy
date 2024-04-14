@@ -100,7 +100,7 @@ impl Registers {
         self.b = ((value & 0xff00) >> 8) as u8;
         self.c = (value & 0x00ff) as u8;
     }
-    
+
     pub const fn de(&self) -> u16 {
         ((self.d as u16) << 8) | (self.e as u16)
     }
@@ -121,14 +121,12 @@ impl Registers {
 }
 
 macro_rules! get_flag {
-    ($bit:literal, $from:ident) => {
-        {
-            static_assertions::const_assert!($bit >= 0);
-            static_assertions::const_assert!($bit < 8);
+    ($bit:literal, $from:ident) => {{
+        static_assertions::const_assert!($bit >= 0);
+        static_assertions::const_assert!($bit < 8);
 
-            $from.f & (1 << $bit) != 0
-        }
-    };
+        $from.f & (1 << $bit) != 0
+    }};
 }
 
 macro_rules! set_flag {
@@ -147,7 +145,7 @@ macro_rules! set_flag {
 /// Flag register operations
 impl Registers {
     pub const fn zero_flag(&self) -> bool {
-       get_flag!(7, self)
+        get_flag!(7, self)
     }
 
     pub fn set_zero_flag(&mut self, value: bool) {
