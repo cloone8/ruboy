@@ -1,5 +1,6 @@
 [package]
 name = "ruboy"
+description = "A gameboy emulator for desktop, based on ruboy_lib"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
