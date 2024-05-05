@@ -24,3 +24,4 @@ boot_img_enabled = []
 static_assertions.workspace = true
 cfg-if.workspace = true
 log.workspace = true
+thiserror.workspace = true

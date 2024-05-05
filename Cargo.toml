@@ -21,6 +21,7 @@ static_assertions = "1.1.0"
 cfg-if = "1.0.0"
 log = "0.4.21"
 simplelog = "0.12.2"
+thiserror = "1.0.59"
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]

@@ -1,3 +1,5 @@
+use crate::isa::decoder::DecoderReadable;
+
 pub struct InlineGBRam {
     mem: [u8; 0xFFFF],
 }
@@ -59,6 +61,15 @@ impl<T: GBRam> MemController<T> {
 
     pub fn write16(&mut self, addr: u16, value: u16) {
         self.ram.write16(addr, value)
+    }
+}
+
+impl<T: GBRam> DecoderReadable for MemController<T> {
+    fn read_at(&self, idx: usize) -> Option<u8> {
+        match u16::try_from(idx) {
+            Ok(addr) => Some(self.read8(addr)),
+            Err(_) => None,
+        }
     }
 }
 

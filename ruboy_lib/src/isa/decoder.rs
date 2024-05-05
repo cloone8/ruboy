@@ -1,3 +1,5 @@
+use thiserror::Error;
+
 use crate::isa::{
     ArithSrc, Condition, IncDecTarget, Instruction, Ld16Dst, Ld16Src, Ld8Dst, Ld8Src, MemLoc,
     Reg16, Reg8,
@@ -5,10 +7,11 @@ use crate::isa::{
 
 use super::{Bit, PrefArithTarget, RsVec};
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum DecodeError {
     /// Not enough bytes in the input
     /// slice to properly decode the error
+    #[error("Could not read enough bytes to decode the instruction")]
     NotEnoughBytes,
 }
 
@@ -347,22 +350,31 @@ const fn decode_prefixed(instr: u8) -> Result<Instruction, DecodeError> {
     Ok(instr)
 }
 
-fn read8(mem: &[u8], idx: u16) -> Result<u8, DecodeError> {
-    mem.get(idx as usize)
-        .ok_or(DecodeError::NotEnoughBytes)
-        .cloned()
+pub trait DecoderReadable {
+    fn read_at(&self, idx: usize) -> Option<u8>;
 }
 
-fn read16(mem: &[u8], idx: u16) -> Result<u16, DecodeError> {
-    let b1 = mem.get(idx as usize).ok_or(DecodeError::NotEnoughBytes)?;
+impl DecoderReadable for &[u8] {
+    fn read_at(&self, idx: usize) -> Option<u8> {
+        self.get(idx).cloned()
+    }
+}
+
+fn read8(mem: &impl DecoderReadable, idx: u16) -> Result<u8, DecodeError> {
+    mem.read_at(idx as usize)
+        .ok_or(DecodeError::NotEnoughBytes)
+}
+
+fn read16(mem: &impl DecoderReadable, idx: u16) -> Result<u16, DecodeError> {
+    let b1 = mem.read_at(idx as usize).ok_or(DecodeError::NotEnoughBytes)?;
     let b2 = mem
-        .get((idx + 1) as usize)
+        .read_at((idx + 1) as usize)
         .ok_or(DecodeError::NotEnoughBytes)?;
 
-    Ok(u16::from_le_bytes([*b1, *b2]))
+    Ok(u16::from_le_bytes([b1, b2]))
 }
 
-pub fn decode(mem: &[u8], pc: u16) -> Result<Instruction, DecodeError> {
+pub fn decode(mem: &impl DecoderReadable, pc: u16) -> Result<Instruction, DecodeError> {
     let opcode = read8(mem, pc)?;
 
     let instr = match opcode {

@@ -8,6 +8,8 @@ pub(crate) struct Registers {
     f: u8,
     h: u8,
     l: u8,
+    sp: u16,
+    pc: u16,
 }
 
 /// Basic register operations
@@ -78,6 +80,22 @@ impl Registers {
 
     pub fn set_l(&mut self, value: u8) {
         self.l = value;
+    }
+
+    pub const fn pc(&self) -> u16 {
+        self.pc
+    }
+
+    pub fn set_pc(&mut self, value: u16) {
+        self.pc = value;
+    }
+
+    pub const fn sp(&self) -> u16 {
+        self.sp
+    }
+
+    pub fn set_sp(&mut self, value: u16) {
+        self.sp = value; 
     }
 }
 

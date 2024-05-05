@@ -1,4 +1,3 @@
-use cfg_if::cfg_if;
 use cpu::Cpu;
 use memcontroller::MemController;
 
@@ -28,6 +27,10 @@ impl<R: GBRam> Gameboy<R> {
         log::info!("Starting Ruboy Emulator");
 
         self.load_boot_rom();
+
+        loop {
+            self.cpu.run_instruction(&mut self.mem).unwrap();
+        }
     }
 
     #[cfg(feature = "boot_img_enabled")]
