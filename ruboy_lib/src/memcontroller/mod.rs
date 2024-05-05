@@ -2,14 +2,28 @@ pub struct InlineGBRam {
     mem: [u8; 0xFFFF],
 }
 
+impl Default for InlineGBRam {
+    fn default() -> Self {
+        InlineGBRam {
+            mem: [0; 0xFFFF]
+        }
+    }
+}
+
 impl InlineGBRam {
     pub fn new() -> InlineGBRam {
-        InlineGBRam { mem: [0; 0xFFFF] }
+        InlineGBRam::default()
     }
 }
 
 pub struct BoxedGBRam {
     mem: Box<[u8; 0xFFFF]>,
+}
+
+impl Default for BoxedGBRam {
+    fn default() -> Self {
+        BoxedGBRam::default()
+    }
 }
 
 impl BoxedGBRam {
@@ -24,7 +38,31 @@ pub struct MemController<T: GBRam> {
     ram: T,
 }
 
-pub trait GBRam {
+impl<T: GBRam> MemController<T> {
+    pub fn new() -> Self {
+        MemController {
+            ram: T::default()
+        }
+    }
+    
+    pub fn read8(&self, addr: u16) -> u8 {
+        self.ram.read8(addr)
+    }
+
+    pub fn read16(&self, addr: u16) -> u16 {
+        self.ram.read16(addr)
+    }
+
+    pub fn write8(&mut self, addr: u16, value: u8) {
+        self.ram.write8(addr, value)
+    }
+
+    pub fn write16(&mut self, addr: u16, value: u16) {
+        self.ram.write16(addr, value)
+    }
+}
+
+pub trait GBRam: Default {
     fn read8(&self, addr: u16) -> u8;
     fn read16(&self, addr: u16) -> u16;
     fn write8(&mut self, addr: u16, value: u8);

@@ -1,0 +1,26 @@
+[package]
+name = "ruboy_lib"
+description = "A easy-to-integrate gameboy emulation library"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+exclude = ["/boot/*.sym"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["boot_dmg"]
+boot_dmg0 = ["boot_img_enabled"]
+boot_dmg = ["boot_img_enabled"]
+boot_mgb = ["boot_img_enabled"]
+boot_img_enabled = []
+
+[dependencies]
+static_assertions.workspace = true
+cfg-if.workspace = true
+log.workspace = true

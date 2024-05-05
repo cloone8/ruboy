@@ -14,7 +14,12 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Publish
-        run: cargo publish --token ${CRATES_TOKEN}
+      - name: Publish lib
+        run: cargo publish --token ${CRATES_TOKEN} -p ruboy_lib
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+      - name: Publish bin
+        run: cargo publish --token ${CRATES_TOKEN} -p ruboy
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}

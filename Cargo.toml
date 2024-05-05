@@ -1,6 +1,11 @@
-[package]
-name = "cpr_gameboy"
-description = "A easy-to-integrate gameboy emulation library"
+[workspace]
+resolver = "2"
+members = [
+    "ruboy",
+    "ruboy_lib"
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["Wouter de Bruijn <wouter@wutru.io>"]
@@ -9,7 +14,9 @@ repository = "https://github.com/cloone8/cpr_gameboy"
 license = "MPL-2.0"
 keywords = ["gameboy", "emulation", "game", "library"]
 categories = ["emulators"]
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
+[workspace.dependencies]
+ruboy_lib = { path = "ruboy_lib", version = "0.1.0" }
 static_assertions = "1.1.0"
+cfg-if = "1.0.0"
+log = "0.4.21"
