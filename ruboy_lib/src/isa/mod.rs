@@ -273,3 +273,79 @@ pub enum Instruction {
     /// Illegal instruction, stop CPU. Opcode is provided for debugging
     IllegalInstruction(u8),
 }
+
+impl Instruction {
+    /// Returns the length of this [`Instruction`] in bytes.
+    #[allow(clippy::len_without_is_empty)]
+    pub const fn len(&self) -> usize {
+        match self {
+            Instruction::Nop => 1,
+            Instruction::Stop => 2,
+            Instruction::Halt => 1,
+            Instruction::EI => 1,
+            Instruction::DI => 2,
+            Instruction::Add(src) => match src {
+                ArithSrc::Reg(_) => 1,
+                ArithSrc::Imm(_) => 2,
+                ArithSrc::Mem(_) => panic!("Instruction does not exist!"),
+            },
+            Instruction::AddCarry(_) => todo!(),
+            Instruction::AddHL(_) => todo!(),
+            Instruction::AddSP(_) => todo!(),
+            Instruction::Sub(_) => todo!(),
+            Instruction::SubCarry(_) => todo!(),
+            Instruction::And(_) => todo!(),
+            Instruction::Or(_) => todo!(),
+            Instruction::Xor(src) => match src {
+                ArithSrc::Reg(_) => 1,
+                ArithSrc::Imm(_) => 2,
+                ArithSrc::Mem(_) => panic!("Instruction does not exist!"),
+            },
+            Instruction::Cmp(_) => todo!(),
+            Instruction::Inc(_) => todo!(),
+            Instruction::Dec(_) => todo!(),
+            Instruction::RotLeftCarry(_) => todo!(),
+            Instruction::RotRightCarry(_) => todo!(),
+            Instruction::RotLeft(_) => todo!(),
+            Instruction::RotRight(_) => todo!(),
+            Instruction::ShiftLeftArith(_) => todo!(),
+            Instruction::ShiftRightArith(_) => todo!(),
+            Instruction::Swap(_) => todo!(),
+            Instruction::ShiftRightLogic(_) => todo!(),
+            Instruction::Bit(_, _) => todo!(),
+            Instruction::Res(_, _) => todo!(),
+            Instruction::Set(_, _) => todo!(),
+            Instruction::Load8(_, _) => todo!(),
+            Instruction::Load16(dst, src) => {
+                if matches!(src, Ld16Src::Imm(_)) || matches!(dst, Ld16Dst::Mem(_)) {
+                    3
+                } else {
+                    1
+                } 
+            },
+            Instruction::LoadAtoHLI => todo!(),
+            Instruction::LoadAtoHLD => todo!(),
+            Instruction::LoadHLItoA => todo!(),
+            Instruction::LoadHLDtoA => todo!(),
+            Instruction::LoadSPi8toHL(_) => todo!(),
+            Instruction::Jump(_) => todo!(),
+            Instruction::JumpRel(_) => todo!(),
+            Instruction::JumpHL => todo!(),
+            Instruction::JumpIf(_, _) => todo!(),
+            Instruction::JumpRelIf(_, _) => todo!(),
+            Instruction::Call(_) => todo!(),
+            Instruction::CallIf(_, _) => todo!(),
+            Instruction::Ret => todo!(),
+            Instruction::Reti => todo!(),
+            Instruction::RetIf(_) => todo!(),
+            Instruction::Pop(_) => todo!(),
+            Instruction::Push(_) => todo!(),
+            Instruction::DecimalAdjust => todo!(),
+            Instruction::ComplementAccumulator => todo!(),
+            Instruction::SetCarryFlag => todo!(),
+            Instruction::ComplementCarry => todo!(),
+            Instruction::Rst(_) => todo!(),
+            Instruction::IllegalInstruction(_) => todo!(),
+        }
+    }
+}

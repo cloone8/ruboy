@@ -193,4 +193,11 @@ impl Registers {
     pub fn set_carry_flag(&mut self, value: bool) {
         set_flag!(4, value, self);
     }
+
+    pub fn set_flags(&mut self, zero: bool, sub: bool, halfcarry: bool, carry: bool) {
+        self.set_zero_flag(zero);
+        self.set_subtract_flag(zero);
+        self.set_half_carry_flag(zero);
+        self.set_carry_flag(zero);
+    }
 }

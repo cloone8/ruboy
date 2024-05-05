@@ -45,6 +45,34 @@ impl Cpu {
     }
 
     #[inline]
+    const fn get_reg8_value(&self, reg: Reg8) -> u8 {
+        match reg {
+            Reg8::A => self.registers.a(),
+            Reg8::B => self.registers.b(),
+            Reg8::C => self.registers.c(),
+            Reg8::D => self.registers.d(),
+            Reg8::E => self.registers.e(),
+            Reg8::F => self.registers.f(),
+            Reg8::H => self.registers.h(),
+            Reg8::L => self.registers.l()
+        }
+    }
+    
+    #[inline]
+    fn set_reg8_value(&mut self, reg: Reg8, val: u8) {
+        match reg {
+            Reg8::A => self.registers.set_a(val),
+            Reg8::B => self.registers.set_b(val),
+            Reg8::C => self.registers.set_c(val),
+            Reg8::D => self.registers.set_d(val),
+            Reg8::E => self.registers.set_e(val),
+            Reg8::F => self.registers.set_f(val),
+            Reg8::H => self.registers.set_h(val),
+            Reg8::L => self.registers.set_l(val)
+        }
+    }
+
+    #[inline]
     fn set_reg16_value(&mut self, reg: Reg16, val: u16) {
         match reg {
             Reg16::AF => self.registers.set_af(val),
@@ -76,7 +104,19 @@ impl Cpu {
             Instruction::SubCarry(_) => todo!("{:?}", instr),
             Instruction::And(_) => todo!("{:?}", instr),
             Instruction::Or(_) => todo!("{:?}", instr),
-            Instruction::Xor(_) => todo!("{:?}", instr),
+            Instruction::Xor(src) => {
+                let val = match src {
+                    ArithSrc::Reg(reg) => self.get_reg8_value(reg),
+                    ArithSrc::Imm(imm) => imm,
+                    ArithSrc::Mem(_) => todo!("{:?}", instr),
+                };
+                
+                let xord = self.registers.a() ^ val;
+
+                self.registers.set_a(xord);
+                
+                self.registers.set_flags(xord == 0, false, false, false);
+            },
             Instruction::Cmp(_) => todo!("{:?}", instr),
             Instruction::Inc(_) => todo!("{:?}", instr),
             Instruction::Dec(_) => todo!("{:?}", instr),
@@ -129,6 +169,12 @@ impl Cpu {
                 return Err(InstructionExecutionError::Illegal(illegal));
             },
         };
+        
+        let instr_len = instr.len() as u16;
+
+        log::trace!("Incrementing PC by {}, 0x{:x} -> 0x{:x}", instr_len, self.registers.pc(), self.registers.pc() + instr_len);
+
+        self.registers.set_pc(self.registers.pc() + instr_len);
 
         Ok(())
     }
