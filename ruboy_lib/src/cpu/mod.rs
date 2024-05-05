@@ -5,11 +5,12 @@ use thiserror::Error;
 use registers::Registers;
 
 use crate::{
-    isa::{self, decoder::{self, DecodeError}, Instruction},
+    isa::*,
     memcontroller::MemController,
-    GBRam,
-    Gameboy
+    GBRam
 };
+
+use self::decoder::DecodeError;
 
 pub struct Cpu {
     registers: Registers,
@@ -29,6 +30,28 @@ impl Cpu {
     pub fn new() -> Self {
         Cpu {
             registers: Registers::new()
+        }
+    }
+
+    #[inline]
+    const fn get_reg16_value(&self, reg: Reg16) -> u16 { 
+        match reg {
+            Reg16::AF => self.registers.af(),
+            Reg16::BC => self.registers.bc(),
+            Reg16::DE => self.registers.de(),
+            Reg16::HL => self.registers.hl(),
+            Reg16::SP => self.registers.sp(),
+        }
+    }
+
+    #[inline]
+    fn set_reg16_value(&mut self, reg: Reg16, val: u16) {
+        match reg {
+            Reg16::AF => self.registers.set_af(val),
+            Reg16::BC => self.registers.set_bc(val),
+            Reg16::DE => self.registers.set_de(val),
+            Reg16::HL => self.registers.set_hl(val),
+            Reg16::SP => self.registers.set_sp(val),
         }
     }
 
@@ -69,7 +92,17 @@ impl Cpu {
             Instruction::Res(_, _) => todo!("{:?}", instr),
             Instruction::Set(_, _) => todo!("{:?}", instr),
             Instruction::Load8(_, _) => todo!("{:?}", instr),
-            Instruction::Load16(_, _) => todo!("{:?}", instr),
+            Instruction::Load16(dst, src) => {
+                let val = match src {
+                    Ld16Src::Reg(reg) => self.get_reg16_value(reg),
+                    Ld16Src::Imm(imm) => imm,
+                }; 
+
+                match dst {
+                    Ld16Dst::Mem(_) => todo!("{:?}", instr),
+                    Ld16Dst::Reg(reg) => self.set_reg16_value(reg, val),
+                }
+            },
             Instruction::LoadAtoHLI => todo!("{:?}", instr),
             Instruction::LoadAtoHLD => todo!("{:?}", instr),
             Instruction::LoadHLItoA => todo!("{:?}", instr),
