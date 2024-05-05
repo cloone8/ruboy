@@ -1,6 +1,10 @@
 use cfg_if::cfg_if;
 use cpu::Cpu;
-use memcontroller::{GBRam, MemController};
+use memcontroller::MemController;
+
+pub use memcontroller::GBRam;
+pub use memcontroller::BoxedGBRam;
+pub use memcontroller::InlineGBRam;
 
 mod boot;
 mod cpu;
@@ -21,14 +25,14 @@ impl<R: GBRam> Gameboy<R> {
     }
 
     pub fn start(&mut self) {
-        log::info!("Starting Gameboy");
+        log::info!("Starting Ruboy Emulator");
 
         self.load_boot_rom();
     }
 
     #[cfg(feature = "boot_img_enabled")]
     fn load_boot_rom(&mut self) {
-        log::info!("Boot ROM enabled, using {}", boot::IMAGE_NAME);
+        log::info!("Boot ROM enabled, using {} image", boot::IMAGE_NAME);
         log::trace!("Boot ROM has length {}", boot::IMAGE.len());
 
         for (i, &byte) in boot::IMAGE.iter().enumerate() {

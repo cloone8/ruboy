@@ -22,15 +22,15 @@ pub struct BoxedGBRam {
 
 impl Default for BoxedGBRam {
     fn default() -> Self {
-        BoxedGBRam::default()
+        BoxedGBRam {
+            mem: Box::new([0; 0xFFFF]),
+        }
     }
 }
 
 impl BoxedGBRam {
     pub fn new() -> BoxedGBRam {
-        BoxedGBRam {
-            mem: Box::new([0; 0xFFFF]),
-        }
+        BoxedGBRam::default()
     }
 }
 
