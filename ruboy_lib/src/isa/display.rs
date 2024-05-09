@@ -558,14 +558,14 @@ impl From<RsVec> for DisplayableOperand {
 macro_rules! to_display_bit {
     ($bit:expr, $opcode:expr, $tgt:expr) => {
         match $bit {
-            super::Bit::B0 => to_display!($opcode, DisplayableOperandType::Extension("0"), $tgt),
-            super::Bit::B1 => to_display!($opcode, DisplayableOperandType::Extension("1"), $tgt),
-            super::Bit::B2 => to_display!($opcode, DisplayableOperandType::Extension("2"), $tgt),
-            super::Bit::B3 => to_display!($opcode, DisplayableOperandType::Extension("3"), $tgt),
-            super::Bit::B4 => to_display!($opcode, DisplayableOperandType::Extension("4"), $tgt),
-            super::Bit::B5 => to_display!($opcode, DisplayableOperandType::Extension("5"), $tgt),
-            super::Bit::B6 => to_display!($opcode, DisplayableOperandType::Extension("6"), $tgt),
-            super::Bit::B7 => to_display!($opcode, DisplayableOperandType::Extension("7"), $tgt),
+            super::Bit::B0 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("0")),
+            super::Bit::B1 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("1")),
+            super::Bit::B2 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("2")),
+            super::Bit::B3 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("3")),
+            super::Bit::B4 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("4")),
+            super::Bit::B5 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("5")),
+            super::Bit::B6 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("6")),
+            super::Bit::B7 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("7")),
         }
     };
 }
@@ -573,13 +573,13 @@ macro_rules! to_display_bit {
 macro_rules! to_display_cond {
     ($cond:expr, $opcode:expr, $tgt:expr) => {
         match $cond {
-            Condition::Zero => to_display!($opcode, DisplayableOperandType::Extension("z"), $tgt),
+            Condition::Zero => to_display!($opcode, $tgt, DisplayableOperandType::Extension("z")),
             Condition::NotZero => {
-                to_display!($opcode, DisplayableOperandType::Extension("nz"), $tgt)
+                to_display!($opcode, $tgt, DisplayableOperandType::Extension("nz"))
             }
-            Condition::Carry => to_display!($opcode, DisplayableOperandType::Extension("c"), $tgt),
+            Condition::Carry => to_display!($opcode, $tgt, DisplayableOperandType::Extension("c")),
             Condition::NotCarry => {
-                to_display!($opcode, DisplayableOperandType::Extension("nc"), $tgt)
+                to_display!($opcode, $tgt, DisplayableOperandType::Extension("nc"))
             }
         }
     };
