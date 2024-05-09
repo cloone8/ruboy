@@ -1,36 +1,7 @@
-use std::fmt::{Display, Formatter, LowerHex};
-
-use num::Signed;
-
 use super::{
     ArithSrc, Condition, IncDecTarget, Instruction, Ld16Dst, Ld16Src, Ld8Dst, Ld8Src, MemLoc,
     PrefArithTarget, Reg16, Reg8, RsVec,
 };
-
-struct SignedHex<T>
-where
-    T: Signed + LowerHex,
-{
-    num: T,
-}
-
-impl<T: Signed + LowerHex> From<T> for SignedHex<T> {
-    fn from(value: T) -> Self {
-        SignedHex { num: value }
-    }
-}
-
-impl<T: Signed + LowerHex> Display for SignedHex<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let abs = self.num.abs();
-
-        if self.num.is_positive() || self.num.is_zero() {
-            write!(f, "0x{:x}", abs)
-        } else {
-            write!(f, "-0x{:x}", abs)
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy)]
 enum DisplayableReg {

@@ -19,11 +19,10 @@ boot_dmg0 = ["boot_img_enabled"]
 boot_dmg = ["boot_img_enabled"]
 boot_mgb = ["boot_img_enabled"]
 boot_img_enabled = []
-isa_display = ["dep:num"]
+isa_display = []
 
 [dependencies]
 static_assertions.workspace = true
 cfg-if.workspace = true
 log.workspace = true
 thiserror.workspace = true
-num = { workspace = true, optional = true}
