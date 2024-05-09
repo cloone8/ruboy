@@ -4,11 +4,7 @@ use thiserror::Error;
 
 use registers::Registers;
 
-use crate::{
-    isa::*,
-    memcontroller::MemController,
-    GBRam
-};
+use crate::{isa::*, memcontroller::MemController, GBRam};
 
 use self::decoder::DecodeError;
 
@@ -18,23 +14,22 @@ pub struct Cpu {
 
 #[derive(Debug, Error)]
 pub enum InstructionExecutionError {
-
     #[error("Error during instruction decoding: {0}")]
     Decode(#[from] DecodeError),
 
     #[error("Illegal instruction: {0}")]
-    Illegal(u8)
+    Illegal(u8),
 }
 
 impl Cpu {
     pub fn new() -> Self {
         Cpu {
-            registers: Registers::new()
+            registers: Registers::new(),
         }
     }
 
     #[inline]
-    const fn get_reg16_value(&self, reg: Reg16) -> u16 { 
+    const fn get_reg16_value(&self, reg: Reg16) -> u16 {
         match reg {
             Reg16::AF => self.registers.af(),
             Reg16::BC => self.registers.bc(),
@@ -54,10 +49,10 @@ impl Cpu {
             Reg8::E => self.registers.e(),
             Reg8::F => self.registers.f(),
             Reg8::H => self.registers.h(),
-            Reg8::L => self.registers.l()
+            Reg8::L => self.registers.l(),
         }
     }
-    
+
     #[inline]
     fn set_reg8_value(&mut self, reg: Reg8, val: u8) {
         match reg {
@@ -68,7 +63,7 @@ impl Cpu {
             Reg8::E => self.registers.set_e(val),
             Reg8::F => self.registers.set_f(val),
             Reg8::H => self.registers.set_h(val),
-            Reg8::L => self.registers.set_l(val)
+            Reg8::L => self.registers.set_l(val),
         }
     }
 
@@ -83,15 +78,18 @@ impl Cpu {
         }
     }
 
-    pub fn run_instruction(&mut self, mem: &mut MemController<impl GBRam>) -> Result<(), InstructionExecutionError> {
-        log::trace!("Running instruction at {:x}", self.registers.pc());
+    pub fn run_instruction(
+        &mut self,
+        mem: &mut MemController<impl GBRam>,
+    ) -> Result<(), InstructionExecutionError> {
+        log::trace!("Running instruction at 0x{:x}", self.registers.pc());
 
         let instr = decoder::decode(mem, self.registers.pc())?;
 
         log::trace!("Decoded instruction: {:?}", instr);
 
         match instr {
-            Instruction::Nop => {},
+            Instruction::Nop => {}
             Instruction::Stop => todo!("{:?}", instr),
             Instruction::Halt => todo!("{:?}", instr),
             Instruction::EI => todo!("{:?}", instr),
@@ -110,13 +108,13 @@ impl Cpu {
                     ArithSrc::Imm(imm) => imm,
                     ArithSrc::Mem(_) => todo!("{:?}", instr),
                 };
-                
+
                 let xord = self.registers.a() ^ val;
 
                 self.registers.set_a(xord);
-                
+
                 self.registers.set_flags(xord == 0, false, false, false);
-            },
+            }
             Instruction::Cmp(_) => todo!("{:?}", instr),
             Instruction::Inc(_) => todo!("{:?}", instr),
             Instruction::Dec(_) => todo!("{:?}", instr),
@@ -128,7 +126,16 @@ impl Cpu {
             Instruction::ShiftRightArith(_) => todo!("{:?}", instr),
             Instruction::Swap(_) => todo!("{:?}", instr),
             Instruction::ShiftRightLogic(_) => todo!("{:?}", instr),
-            Instruction::Bit(_, _) => todo!("{:?}", instr),
+            Instruction::Bit(bit, tgt) => {
+                let val = match tgt {
+                    PrefArithTarget::Reg(reg) => self.get_reg8_value(reg),
+                    PrefArithTarget::MemHL => todo!("{:?}", instr),
+                };
+
+                let is_zero = val & (1 << (bit as usize)) == 0;
+
+                self.registers.set_zero_flag(is_zero);
+            }
             Instruction::Res(_, _) => todo!("{:?}", instr),
             Instruction::Set(_, _) => todo!("{:?}", instr),
             Instruction::Load8(_, _) => todo!("{:?}", instr),
@@ -136,15 +143,29 @@ impl Cpu {
                 let val = match src {
                     Ld16Src::Reg(reg) => self.get_reg16_value(reg),
                     Ld16Src::Imm(imm) => imm,
-                }; 
+                };
 
                 match dst {
                     Ld16Dst::Mem(_) => todo!("{:?}", instr),
                     Ld16Dst::Reg(reg) => self.set_reg16_value(reg, val),
                 }
-            },
-            Instruction::LoadAtoHLI => todo!("{:?}", instr),
-            Instruction::LoadAtoHLD => todo!("{:?}", instr),
+            }
+            Instruction::LoadAtoHLI => {
+                let val = self.registers.a();
+                let addr = self.registers.hl();
+
+                mem.write8(addr, val);
+
+                self.registers.set_hl(addr + 1);
+            }
+            Instruction::LoadAtoHLD => {
+                let val = self.registers.a();
+                let addr = self.registers.hl();
+
+                mem.write8(addr, val);
+
+                self.registers.set_hl(addr - 1);
+            }
             Instruction::LoadHLItoA => todo!("{:?}", instr),
             Instruction::LoadHLDtoA => todo!("{:?}", instr),
             Instruction::LoadSPi8toHL(_) => todo!("{:?}", instr),
@@ -167,12 +188,17 @@ impl Cpu {
             Instruction::Rst(_) => todo!("{:?}", instr),
             Instruction::IllegalInstruction(illegal) => {
                 return Err(InstructionExecutionError::Illegal(illegal));
-            },
+            }
         };
-        
+
         let instr_len = instr.len() as u16;
 
-        log::trace!("Incrementing PC by {}, 0x{:x} -> 0x{:x}", instr_len, self.registers.pc(), self.registers.pc() + instr_len);
+        log::trace!(
+            "Incrementing PC by {}, 0x{:x} -> 0x{:x}",
+            instr_len,
+            self.registers.pc(),
+            self.registers.pc() + instr_len
+        );
 
         self.registers.set_pc(self.registers.pc() + instr_len);
 

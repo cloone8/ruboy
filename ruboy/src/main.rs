@@ -1,6 +1,13 @@
+use clap::Parser;
 use ruboy_lib::{self, BoxedGBRam, Gameboy};
 
+use crate::args::CLIArgs;
+
+mod args;
+
 fn main() {
+    let args = CLIArgs::parse();
+
     let logconfig = simplelog::ConfigBuilder::new()
         .set_time_format_rfc3339()
         .set_time_offset_to_local()
@@ -8,7 +15,7 @@ fn main() {
         .build();
 
     simplelog::TermLogger::init(
-        simplelog::LevelFilter::Info,
+        args.verbosity.into(),
         logconfig,
         simplelog::TerminalMode::Stdout,
         simplelog::ColorChoice::Auto

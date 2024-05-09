@@ -16,3 +16,4 @@ categories.workspace = true
 ruboy_lib.workspace = true
 log = { workspace = true, features = ["release_max_level_info"]}
 simplelog.workspace = true
+clap.workspace = true
