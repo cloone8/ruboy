@@ -125,16 +125,12 @@ impl Ld16Dst {
 pub enum IncDecTarget {
     Reg8(Reg8),
     Reg16(Reg16),
-    Mem(MemLoc),
+    MemHL,
 }
 
 impl IncDecTarget {
     const fn op_size(&self) -> u8 {
-        match self {
-            IncDecTarget::Reg8(_) => 0,
-            IncDecTarget::Reg16(_) => 0,
-            IncDecTarget::Mem(memloc) => memloc.op_size(),
-        }
+        0
     }
 }
 
@@ -376,7 +372,7 @@ impl Instruction {
             Instruction::Res(_, _) => 2,
             Instruction::Set(_, _) => 2,
             Instruction::Load8(dst, src) => 1 + dst.op_size() + src.op_size(),
-            Instruction::Load16(dst, src) => 1 + dst.op_size() + src.op_size(), 
+            Instruction::Load16(dst, src) => 1 + dst.op_size() + src.op_size(),
             Instruction::LoadAtoHLI => 1,
             Instruction::LoadAtoHLD => 1,
             Instruction::LoadHLItoA => 1,

@@ -21,6 +21,12 @@ pub enum InstructionExecutionError {
     Illegal(u8),
 }
 
+macro_rules! instr_todo {
+    ($instr:expr) => {
+        todo!("{:?}", $instr)
+    };
+}
+
 impl Cpu {
     pub fn new() -> Self {
         Cpu {
@@ -78,6 +84,29 @@ impl Cpu {
         }
     }
 
+    fn memloc_to_addr(&self, memloc: MemLoc) -> u16 {
+        match memloc {
+            MemLoc::HighMemReg(reg) => 0xFF00 | (self.get_reg8_value(reg) as u16),
+            MemLoc::Reg(reg) => self.get_reg16_value(reg),
+            MemLoc::HighMemImm(imm) => 0xFF00 | (imm as u16),
+            MemLoc::Imm(imm) => imm,
+        }
+    }
+
+    fn check_condition(&self, cond: Condition) -> bool {
+        match cond {
+            Condition::Zero => self.registers.zero_flag(),
+            Condition::NotZero => !self.registers.zero_flag(),
+            Condition::Carry => self.registers.carry_flag(),
+            Condition::NotCarry => !self.registers.carry_flag(),
+        }
+    }
+
+    fn do_rel_jump(&mut self, base: u16, offset: i8) {
+        let jump_addr = u16::try_from((base as i32) + (offset as i32)).unwrap();
+        self.registers.set_pc(jump_addr);
+    }
+
     pub fn run_instruction(
         &mut self,
         mem: &mut MemController<impl GBRam>,
@@ -88,25 +117,27 @@ impl Cpu {
 
         log::trace!("Decoded instruction: {:?}", instr);
 
+        let mut skip_pc_increment = false;
+
         match instr {
             Instruction::Nop => {}
-            Instruction::Stop => todo!("{:?}", instr),
-            Instruction::Halt => todo!("{:?}", instr),
-            Instruction::EI => todo!("{:?}", instr),
-            Instruction::DI => todo!("{:?}", instr),
-            Instruction::Add(_) => todo!("{:?}", instr),
-            Instruction::AddCarry(_) => todo!("{:?}", instr),
-            Instruction::AddHL(_) => todo!("{:?}", instr),
-            Instruction::AddSP(_) => todo!("{:?}", instr),
-            Instruction::Sub(_) => todo!("{:?}", instr),
-            Instruction::SubCarry(_) => todo!("{:?}", instr),
-            Instruction::And(_) => todo!("{:?}", instr),
-            Instruction::Or(_) => todo!("{:?}", instr),
+            Instruction::Stop => instr_todo!(instr),
+            Instruction::Halt => instr_todo!(instr),
+            Instruction::EI => instr_todo!(instr),
+            Instruction::DI => instr_todo!(instr),
+            Instruction::Add(_) => instr_todo!(instr),
+            Instruction::AddCarry(_) => instr_todo!(instr),
+            Instruction::AddHL(_) => instr_todo!(instr),
+            Instruction::AddSP(_) => instr_todo!(instr),
+            Instruction::Sub(_) => instr_todo!(instr),
+            Instruction::SubCarry(_) => instr_todo!(instr),
+            Instruction::And(_) => instr_todo!(instr),
+            Instruction::Or(_) => instr_todo!(instr),
             Instruction::Xor(src) => {
                 let val = match src {
                     ArithSrc::Reg(reg) => self.get_reg8_value(reg),
                     ArithSrc::Imm(imm) => imm,
-                    ArithSrc::Mem(_) => todo!("{:?}", instr),
+                    ArithSrc::Mem(_) => instr_todo!(instr),
                 };
 
                 let xord = self.registers.a() ^ val;
@@ -115,30 +146,55 @@ impl Cpu {
 
                 self.registers.set_flags(xord == 0, false, false, false);
             }
-            Instruction::Cmp(_) => todo!("{:?}", instr),
-            Instruction::Inc(_) => todo!("{:?}", instr),
-            Instruction::Dec(_) => todo!("{:?}", instr),
-            Instruction::RotLeftCarry(_) => todo!("{:?}", instr),
-            Instruction::RotRightCarry(_) => todo!("{:?}", instr),
-            Instruction::RotLeft(_) => todo!("{:?}", instr),
-            Instruction::RotRight(_) => todo!("{:?}", instr),
-            Instruction::ShiftLeftArith(_) => todo!("{:?}", instr),
-            Instruction::ShiftRightArith(_) => todo!("{:?}", instr),
-            Instruction::Swap(_) => todo!("{:?}", instr),
-            Instruction::ShiftRightLogic(_) => todo!("{:?}", instr),
+            Instruction::Cmp(_) => instr_todo!(instr),
+            Instruction::Inc(tgt) => match tgt {
+                IncDecTarget::Reg8(reg) => self.set_reg8_value(reg, self.get_reg8_value(reg)),
+                IncDecTarget::Reg16(reg) => self.set_reg16_value(reg, self.get_reg16_value(reg)),
+                IncDecTarget::MemHL => {
+                    let addr = self.registers.hl();
+                    mem.write8(addr, mem.read8(addr) + 1);
+                }
+            },
+            Instruction::Dec(tgt) => match tgt {
+                IncDecTarget::Reg8(reg) => self.set_reg8_value(reg, self.get_reg8_value(reg)),
+                IncDecTarget::Reg16(reg) => self.set_reg16_value(reg, self.get_reg16_value(reg)),
+                IncDecTarget::MemHL => {
+                    let addr = self.registers.hl();
+                    mem.write8(addr, mem.read8(addr) - 1);
+                }
+            },
+            Instruction::RotLeftCarry(_) => instr_todo!(instr),
+            Instruction::RotRightCarry(_) => instr_todo!(instr),
+            Instruction::RotLeft(_) => instr_todo!(instr),
+            Instruction::RotRight(_) => instr_todo!(instr),
+            Instruction::ShiftLeftArith(_) => instr_todo!(instr),
+            Instruction::ShiftRightArith(_) => instr_todo!(instr),
+            Instruction::Swap(_) => instr_todo!(instr),
+            Instruction::ShiftRightLogic(_) => instr_todo!(instr),
             Instruction::Bit(bit, tgt) => {
                 let val = match tgt {
                     PrefArithTarget::Reg(reg) => self.get_reg8_value(reg),
-                    PrefArithTarget::MemHL => todo!("{:?}", instr),
+                    PrefArithTarget::MemHL => instr_todo!(instr),
                 };
 
                 let is_zero = val & (1 << (bit as usize)) == 0;
 
                 self.registers.set_zero_flag(is_zero);
             }
-            Instruction::Res(_, _) => todo!("{:?}", instr),
-            Instruction::Set(_, _) => todo!("{:?}", instr),
-            Instruction::Load8(_, _) => todo!("{:?}", instr),
+            Instruction::Res(_, _) => instr_todo!(instr),
+            Instruction::Set(_, _) => instr_todo!(instr),
+            Instruction::Load8(dst, src) => {
+                let val = match src {
+                    Ld8Src::Reg(reg) => self.get_reg8_value(reg),
+                    Ld8Src::Mem(memloc) => mem.read8(self.memloc_to_addr(memloc)),
+                    Ld8Src::Imm(imm) => imm,
+                };
+
+                match dst {
+                    Ld8Dst::Mem(memloc) => mem.write8(self.memloc_to_addr(memloc), val),
+                    Ld8Dst::Reg(reg) => self.set_reg8_value(reg, val),
+                }
+            }
             Instruction::Load16(dst, src) => {
                 let val = match src {
                     Ld16Src::Reg(reg) => self.get_reg16_value(reg),
@@ -146,7 +202,7 @@ impl Cpu {
                 };
 
                 match dst {
-                    Ld16Dst::Mem(_) => todo!("{:?}", instr),
+                    Ld16Dst::Mem(memloc) => mem.write16(self.memloc_to_addr(memloc), val),
                     Ld16Dst::Reg(reg) => self.set_reg16_value(reg, val),
                 }
             }
@@ -166,41 +222,52 @@ impl Cpu {
 
                 self.registers.set_hl(addr - 1);
             }
-            Instruction::LoadHLItoA => todo!("{:?}", instr),
-            Instruction::LoadHLDtoA => todo!("{:?}", instr),
-            Instruction::LoadSPi8toHL(_) => todo!("{:?}", instr),
-            Instruction::Jump(_) => todo!("{:?}", instr),
-            Instruction::JumpRel(_) => todo!("{:?}", instr),
-            Instruction::JumpHL => todo!("{:?}", instr),
-            Instruction::JumpIf(_, _) => todo!("{:?}", instr),
-            Instruction::JumpRelIf(_, _) => todo!("{:?}", instr),
-            Instruction::Call(_) => todo!("{:?}", instr),
-            Instruction::CallIf(_, _) => todo!("{:?}", instr),
-            Instruction::Ret => todo!("{:?}", instr),
-            Instruction::Reti => todo!("{:?}", instr),
-            Instruction::RetIf(_) => todo!("{:?}", instr),
-            Instruction::Pop(_) => todo!("{:?}", instr),
-            Instruction::Push(_) => todo!("{:?}", instr),
-            Instruction::DecimalAdjust => todo!("{:?}", instr),
-            Instruction::ComplementAccumulator => todo!("{:?}", instr),
-            Instruction::SetCarryFlag => todo!("{:?}", instr),
-            Instruction::ComplementCarry => todo!("{:?}", instr),
-            Instruction::Rst(_) => todo!("{:?}", instr),
+            Instruction::LoadHLItoA => instr_todo!(instr),
+            Instruction::LoadHLDtoA => instr_todo!(instr),
+            Instruction::LoadSPi8toHL(_) => instr_todo!(instr),
+            Instruction::Jump(_) => instr_todo!(instr),
+            Instruction::JumpRel(offset) => {
+                self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset)
+            }
+            Instruction::JumpHL => instr_todo!(instr),
+            Instruction::JumpIf(_, _) => instr_todo!(instr),
+            Instruction::JumpRelIf(offset, condition) => {
+                if self.check_condition(condition) {
+                    self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset);
+                    skip_pc_increment = true;
+                }
+            }
+            Instruction::Call(_) => instr_todo!(instr),
+            Instruction::CallIf(_, _) => instr_todo!(instr),
+            Instruction::Ret => instr_todo!(instr),
+            Instruction::Reti => instr_todo!(instr),
+            Instruction::RetIf(_) => instr_todo!(instr),
+            Instruction::Pop(_) => instr_todo!(instr),
+            Instruction::Push(_) => instr_todo!(instr),
+            Instruction::DecimalAdjust => instr_todo!(instr),
+            Instruction::ComplementAccumulator => instr_todo!(instr),
+            Instruction::SetCarryFlag => instr_todo!(instr),
+            Instruction::ComplementCarry => instr_todo!(instr),
+            Instruction::Rst(_) => instr_todo!(instr),
             Instruction::IllegalInstruction(illegal) => {
                 return Err(InstructionExecutionError::Illegal(illegal));
             }
         };
 
-        let instr_len = instr.len() as u16;
+        if !skip_pc_increment {
+            let instr_len = instr.len() as u16;
 
-        log::trace!(
-            "Incrementing PC by {}, 0x{:x} -> 0x{:x}",
-            instr_len,
-            self.registers.pc(),
-            self.registers.pc() + instr_len
-        );
+            log::trace!(
+                "Incrementing PC by {}, 0x{:x} -> 0x{:x}",
+                instr_len,
+                self.registers.pc(),
+                self.registers.pc() + instr_len
+            );
 
-        self.registers.set_pc(self.registers.pc() + instr_len);
+            self.registers.set_pc(self.registers.pc() + instr_len);
+        } else {
+            log::trace!("Skipping PC increment");
+        }
 
         Ok(())
     }

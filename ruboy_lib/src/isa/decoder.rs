@@ -361,12 +361,13 @@ impl DecoderReadable for &[u8] {
 }
 
 fn read8(mem: &impl DecoderReadable, idx: u16) -> Result<u8, DecodeError> {
-    mem.read_at(idx as usize)
-        .ok_or(DecodeError::NotEnoughBytes)
+    mem.read_at(idx as usize).ok_or(DecodeError::NotEnoughBytes)
 }
 
 fn read16(mem: &impl DecoderReadable, idx: u16) -> Result<u16, DecodeError> {
-    let b1 = mem.read_at(idx as usize).ok_or(DecodeError::NotEnoughBytes)?;
+    let b1 = mem
+        .read_at(idx as usize)
+        .ok_or(DecodeError::NotEnoughBytes)?;
     let b2 = mem
         .read_at((idx + 1) as usize)
         .ok_or(DecodeError::NotEnoughBytes)?;
@@ -440,8 +441,8 @@ pub fn decode(mem: &impl DecoderReadable, pc: u16) -> Result<Instruction, Decode
         0x31 => Instruction::Load16(Ld16Dst::Reg(Reg16::SP), Ld16Src::Imm(read16(mem, pc + 1)?)),
         0x32 => Instruction::LoadAtoHLD,
         0x33 => Instruction::Inc(IncDecTarget::Reg16(Reg16::SP)),
-        0x34 => Instruction::Inc(IncDecTarget::Mem(MemLoc::Reg(Reg16::HL))),
-        0x35 => Instruction::Dec(IncDecTarget::Mem(MemLoc::Reg(Reg16::HL))),
+        0x34 => Instruction::Inc(IncDecTarget::MemHL),
+        0x35 => Instruction::Dec(IncDecTarget::MemHL),
         0x36 => Instruction::Load8(
             Ld8Dst::Mem(MemLoc::Reg(Reg16::HL)),
             Ld8Src::Imm(read8(mem, pc + 1)?),
