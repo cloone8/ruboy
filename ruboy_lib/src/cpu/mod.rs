@@ -107,6 +107,37 @@ impl Cpu {
         self.registers.set_pc(jump_addr);
     }
 
+    fn do_push8(&mut self, mem: &mut MemController<impl GBRam>, val: u8) {
+        self.registers.set_sp(self.registers.sp() - 1);
+        mem.write8(self.registers.sp(), val);
+    }
+
+    fn do_pop8(&mut self, mem: &mut MemController<impl GBRam>) -> u8 {
+        let val = mem.read8(self.registers.sp());
+
+        self.registers.set_sp(self.registers.sp() + 1);
+
+        val
+    }
+
+    fn do_push16(&mut self, mem: &mut MemController<impl GBRam>, val: u16) {
+        self.registers.set_sp(self.registers.sp() - 2);
+        mem.write16(self.registers.sp(), val);
+    }
+
+    fn do_pop16(&mut self, mem: &mut MemController<impl GBRam>) -> u16 {
+        let val = mem.read16(self.registers.sp());
+
+        self.registers.set_sp(self.registers.sp() + 2);
+
+        val
+    }
+
+    fn do_call<T: GBRam>(&mut self, mem: &mut MemController<T>, return_addr: u16, call_addr: u16) {
+        self.do_push16(mem, return_addr);
+        self.registers.set_pc(call_addr);
+    }
+
     pub fn run_instruction(
         &mut self,
         mem: &mut MemController<impl GBRam>,
@@ -227,7 +258,8 @@ impl Cpu {
             Instruction::LoadSPi8toHL(_) => instr_todo!(instr),
             Instruction::Jump(_) => instr_todo!(instr),
             Instruction::JumpRel(offset) => {
-                self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset)
+                self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset);
+                skip_pc_increment = true;
             }
             Instruction::JumpHL => instr_todo!(instr),
             Instruction::JumpIf(_, _) => instr_todo!(instr),
@@ -237,13 +269,34 @@ impl Cpu {
                     skip_pc_increment = true;
                 }
             }
-            Instruction::Call(_) => instr_todo!(instr),
-            Instruction::CallIf(_, _) => instr_todo!(instr),
+            Instruction::Call(addr) => {
+                let curr_addr = self.registers.pc();
+                let return_addr = curr_addr + (instr.len() as u16);
+
+                self.do_call(mem, return_addr, addr);
+
+                skip_pc_increment = true;
+            }
+            Instruction::CallIf(addr, cond) => {
+                if self.check_condition(cond) {
+                    let curr_addr = self.registers.pc();
+                    let return_addr = curr_addr + (instr.len() as u16);
+
+                    self.do_call(mem, return_addr, addr);
+
+                    skip_pc_increment = true;
+                }
+            }
             Instruction::Ret => instr_todo!(instr),
             Instruction::Reti => instr_todo!(instr),
             Instruction::RetIf(_) => instr_todo!(instr),
-            Instruction::Pop(_) => instr_todo!(instr),
-            Instruction::Push(_) => instr_todo!(instr),
+            Instruction::Pop(reg) => {
+                let val = self.do_pop16(mem);
+                self.set_reg16_value(reg, val)
+            }
+            Instruction::Push(reg) => {
+                self.do_push16(mem, self.get_reg16_value(reg));
+            }
             Instruction::DecimalAdjust => instr_todo!(instr),
             Instruction::ComplementAccumulator => instr_todo!(instr),
             Instruction::SetCarryFlag => instr_todo!(instr),
