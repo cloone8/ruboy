@@ -23,7 +23,7 @@ pub enum InstructionExecutionError {
 
 macro_rules! instr_todo {
     ($instr:expr) => {
-        todo!("{:?}", $instr)
+        todo!("{}", $instr)
     };
 }
 
@@ -146,7 +146,7 @@ impl Cpu {
 
         let instr = decoder::decode(mem, self.registers.pc())?;
 
-        log::trace!("Decoded instruction: {:?}", instr);
+        log::trace!("Decoded instruction: {}", instr);
 
         let mut skip_pc_increment = false;
 
