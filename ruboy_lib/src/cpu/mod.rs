@@ -152,7 +152,7 @@ impl Cpu {
 
         match instr {
             Instruction::Nop => {}
-            Instruction::Stop => instr_todo!(instr),
+            Instruction::Stop(_) => instr_todo!(instr),
             Instruction::Halt => instr_todo!(instr),
             Instruction::EI => instr_todo!(instr),
             Instruction::DI => instr_todo!(instr),

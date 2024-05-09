@@ -1,4 +1,9 @@
+use std::fmt::Display;
+
 pub mod decoder;
+
+#[cfg(feature = "isa_display")]
+pub mod display;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Reg8 {
@@ -180,7 +185,7 @@ pub enum Instruction {
     Nop,
 
     /// Enter low power mode
-    Stop,
+    Stop(u8),
 
     /// Enter low power mode until interrupt
     Halt,
@@ -344,7 +349,7 @@ impl Instruction {
     pub const fn len(&self) -> u8 {
         match self {
             Instruction::Nop => 1,
-            Instruction::Stop => 2,
+            Instruction::Stop(_) => 2,
             Instruction::Halt => 1,
             Instruction::EI => 1,
             Instruction::DI => 2,
@@ -397,5 +402,23 @@ impl Instruction {
             Instruction::Rst(_) => 1,
             Instruction::IllegalInstruction(_) => panic!("Illegal instruction has no length"),
         }
+    }
+}
+
+impl Display for Instruction {
+    #[cfg(feature = "isa_display")]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let as_displayable = display::DisplayableInstruction::from(*self);
+
+        write!(
+            f,
+            "{}",
+            as_displayable.with_format(display::FormatOpts::rgdbs())
+        )
+    }
+
+    #[cfg(not(feature = "isa_display"))]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }

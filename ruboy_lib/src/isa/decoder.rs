@@ -401,7 +401,7 @@ pub fn decode(mem: &impl DecoderReadable, pc: u16) -> Result<Instruction, Decode
         0x0F => Instruction::RotRightCarry(PrefArithTarget::Reg(Reg8::A)),
 
         // 0x1_
-        0x10 => Instruction::Stop,
+        0x10 => Instruction::Stop(read8(mem, pc + 1)?),
         0x11 => Instruction::Load16(Ld16Dst::Reg(Reg16::DE), Ld16Src::Imm(read16(mem, pc + 1)?)),
         0x12 => Instruction::Load8(Ld8Dst::Mem(MemLoc::Reg(Reg16::DE)), Ld8Src::Reg(Reg8::A)),
         0x13 => Instruction::Inc(IncDecTarget::Reg16(Reg16::DE)),

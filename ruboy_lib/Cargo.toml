@@ -14,14 +14,16 @@ exclude = ["/boot/*.sym"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["boot_dmg"]
+default = ["boot_dmg", "isa_display"]
 boot_dmg0 = ["boot_img_enabled"]
 boot_dmg = ["boot_img_enabled"]
 boot_mgb = ["boot_img_enabled"]
 boot_img_enabled = []
+isa_display = ["dep:num"]
 
 [dependencies]
 static_assertions.workspace = true
 cfg-if.workspace = true
 log.workspace = true
 thiserror.workspace = true
+num = { workspace = true, optional = true}
