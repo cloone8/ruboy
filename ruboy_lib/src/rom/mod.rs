@@ -1,4 +1,4 @@
-use std::{io::Read, num::Wrapping};
+use std::{fmt::Display, io::Read, num::Wrapping};
 
 use thiserror::Error;
 
@@ -17,6 +17,60 @@ pub struct RomMeta {
     header_checksum: u8,
     header_checksum_valid: bool,
     global_checksum: u16,
+}
+
+impl RomMeta {
+    pub fn title(&self) -> &str {
+        self.title.as_str()
+    }
+
+    pub fn manufacturer(&self) -> Manufacturer {
+        self.manufacturer
+    }
+
+    pub fn cgb_support(&self) -> CgbFlag {
+        self.cgb_flag
+    }
+
+    pub fn licensee(&self) -> Licensee {
+        self.licensee
+    }
+
+    pub fn sgb_support(&self) -> bool {
+        self.sgb_flag
+    }
+
+    pub fn cartridge_hardware(&self) -> CartridgeHardware {
+        self.cartridge_hardware
+    }
+
+    pub fn rom_size(&self) -> RomSize {
+        self.rom_size
+    }
+
+    pub fn ram_size(&self) -> RamSize {
+        self.ram_size
+    }
+
+    pub fn destination(&self) -> Destination {
+        self.destination
+    }
+
+    pub fn game_version(&self) -> u8 {
+        self.game_version
+    }
+
+    pub fn header_checksum(&self) -> u8 {
+        self.header_checksum
+    }
+
+    pub fn header_checksum_valid(&self) -> bool {
+        self.header_checksum_valid
+    }
+
+    pub fn global_checksum(&self) -> u16 {
+        self.global_checksum
+    }
 }
 
 fn get_last_nonnull_idx(bytes: &[u8]) -> usize {
@@ -187,6 +241,12 @@ pub struct Manufacturer {
     raw: [u8; 4],
 }
 
+impl Display for Manufacturer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", u32::from_be_bytes(self.raw))
+    }
+}
+
 impl Manufacturer {
     fn from_raw(raw: &[u8]) -> Result<Self, RomMetaParseError> {
         if raw.len() < 4 {
@@ -205,6 +265,15 @@ pub enum Licensee {
     New { raw: [u8; 2] },
 }
 
+impl Display for Licensee {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Licensee::Old { raw } => write!(f, "0x{:x}", raw),
+            Licensee::New { raw } => write!(f, "0x{:x}", u16::from_be_bytes(*raw)),
+        }
+    }
+}
+
 impl Licensee {
     fn new(old_code: u8, new_code: [u8; 2]) -> Self {
         if old_code != 0x33 {
@@ -220,6 +289,16 @@ pub enum CgbFlag {
     NoCgb,
     CgbBackwards,
     CgbOnly,
+}
+
+impl Display for CgbFlag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CgbFlag::NoCgb => write!(f, "No CGB support"),
+            CgbFlag::CgbBackwards => write!(f, "CGB support (backwards compatible)"),
+            CgbFlag::CgbOnly => write!(f, "CGB support (not backwards compatible)"),
+        }
+    }
 }
 
 impl From<u8> for CgbFlag {
@@ -246,6 +325,23 @@ pub enum CartridgeMapper {
     HuC3,
 }
 
+impl Display for CartridgeMapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CartridgeMapper::MBC1 => write!(f, "MBC1"),
+            CartridgeMapper::MBC2 => write!(f, "MBC2"),
+            CartridgeMapper::MMM01 => write!(f, "MMM01"),
+            CartridgeMapper::MBC3 => write!(f, "MBC3"),
+            CartridgeMapper::MBC4 => write!(f, "MBC4"),
+            CartridgeMapper::MBC5 => write!(f, "MBC5"),
+            CartridgeMapper::MBC6 => write!(f, "MBC6"),
+            CartridgeMapper::MBC7 => write!(f, "MBC7"),
+            CartridgeMapper::HuC1 => write!(f, "HuC1"),
+            CartridgeMapper::HuC3 => write!(f, "HuC3"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct CartridgeHardware {
     raw: u8,
@@ -256,6 +352,36 @@ pub struct CartridgeHardware {
     has_rumble: bool,
     has_sensor: bool,
     has_camera: bool,
+}
+
+impl CartridgeHardware {
+    pub fn mapper(&self) -> Option<CartridgeMapper> {
+        self.mapper
+    }
+
+    pub fn has_ram(&self) -> bool {
+        self.has_ram
+    }
+
+    pub fn has_battery(&self) -> bool {
+        self.has_battery
+    }
+
+    pub fn has_timer(&self) -> bool {
+        self.has_timer
+    }
+
+    pub fn has_rumble(&self) -> bool {
+        self.has_rumble
+    }
+
+    pub fn has_sensor(&self) -> bool {
+        self.has_sensor
+    }
+
+    pub fn has_camera(&self) -> bool {
+        self.has_camera
+    }
 }
 
 impl TryFrom<u8> for CartridgeHardware {
@@ -396,6 +522,17 @@ pub struct RomSize {
     raw: u8,
 }
 
+impl Display for RomSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} KiB ({} banks)",
+            self.in_bytes() / 1024,
+            self.num_banks()
+        )
+    }
+}
+
 impl TryFrom<u8> for RomSize {
     type Error = ();
 
@@ -423,6 +560,17 @@ impl RomSize {
 #[derive(Debug, Clone, Copy)]
 pub struct RamSize {
     raw: u8,
+}
+
+impl Display for RamSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} KiB ({} banks)",
+            self.in_bytes() / 1024,
+            self.num_banks()
+        )
+    }
 }
 
 impl RamSize {
@@ -463,6 +611,17 @@ impl TryFrom<u8> for RamSize {
 pub enum Destination {
     Japan = 0,
     Elsewhere = 1,
+}
+
+impl Display for Destination {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dest = match self {
+            Destination::Japan => "Japan",
+            Destination::Elsewhere => "Elsewhere",
+        };
+
+        write!(f, "{}", dest)
+    }
 }
 
 impl TryFrom<u8> for Destination {
