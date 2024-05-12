@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use colored::*;
 use ruboy_binutils::cli::romdump;
 use ruboy_lib::rom::{CartridgeHardware, RomMeta};
 
@@ -22,59 +23,58 @@ fn seek_to_header_start(r: &mut BufReader<File>) -> Result<()> {
     Ok(())
 }
 
-fn generate_checksum_string(valid: bool) -> &'static str {
+fn generate_checksum_string(valid: bool) -> ColoredString {
     if valid {
-        "valid"
+        "valid".green()
     } else {
-        "invalid"
+        "invalid".red()
     }
 }
 
-fn display_cartridge_hardware(hw: &CartridgeHardware) {
+#[rustfmt::skip]
+fn display_rom_meta(meta: &RomMeta) {
+    println!("Title:                 {}", meta.title());
+    println!("Manufacturer:          {}", meta.manufacturer());
+    println!("CGB support:           {}", meta.cgb_support());
+    println!("Licensee:              {}", meta.licensee());
+    println!("SGB Support:           {}", meta.sgb_support());
+
+    println!("Cartridge hardware:");
+    let hw = meta.cartridge_hardware();
+
     if let Some(mapper) = hw.mapper() {
-        println!("\t- Mapper: {}", mapper);
+        println!("                       - Mapper: {}", mapper);
     }
 
     if hw.has_ram() {
-        println!("\t- RAM");
+        println!("                       - RAM");
     }
     if hw.has_battery() {
-        println!("\t- Battery");
+        println!("                       - Battery");
     }
     if hw.has_timer() {
-        println!("\t- Timer");
+        println!("                       - Timer");
     }
     if hw.has_rumble() {
-        println!("\t- Rumble");
+        println!("                       - Rumble");
     }
     if hw.has_sensor() {
-        println!("\t- Sensor");
+        println!("                       - Sensor");
     }
     if hw.has_camera() {
-        println!("\t- Camera");
+        println!("                       - Camera");
     }
-}
 
-fn display_rom_meta(meta: &RomMeta) {
-    println!("Title: {}", meta.title());
-    println!("Manufacturer: {}", meta.manufacturer());
-    println!("CGB support: {}", meta.cgb_support());
-    println!("Licensee: {}", meta.licensee());
-    println!("SGB Support: {}", meta.sgb_support());
-
-    println!("Cartridge hardware:");
-    display_cartridge_hardware(&meta.cartridge_hardware());
-
-    println!("ROM size: {}", meta.rom_size());
-    println!("RAM size: {}", meta.ram_size());
-    println!("Intented destination: {}", meta.destination());
-    println!("Game version number: {}", meta.game_version());
+    println!("ROM size:              {}", meta.rom_size());
+    println!("RAM size:              {}", meta.ram_size());
+    println!("Intented destination:  {}", meta.destination());
+    println!("Game version number:   {}", meta.game_version());
     println!(
-        "Header checksum: 0x{:x} ({})",
-        meta.header_checksum(),
-        generate_checksum_string(meta.header_checksum_valid())
+             "Header checksum:       0x{:x} ({})",
+             meta.header_checksum(),
+             generate_checksum_string(meta.header_checksum_valid())
     );
-    println!("Global checksum: 0x{:x}", meta.global_checksum());
+    println!("Global checksum:       0x{:x}", meta.global_checksum());
 }
 
 fn main() -> Result<()> {

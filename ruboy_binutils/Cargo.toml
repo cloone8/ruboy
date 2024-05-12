@@ -17,3 +17,4 @@ ruboy_lib.workspace = true
 log.workspace = true
 anyhow.workspace = true
 clap.workspace = true
+colored.workspace = true
