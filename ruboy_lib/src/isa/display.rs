@@ -158,7 +158,7 @@ impl DisplayableImmediate {
         match self {
             DisplayableImmediate::U8(x) => format_immediate!(fmt, x),
             DisplayableImmediate::I8(x) => {
-                let abs = x.abs();
+                let abs = (*x as i16).abs(); // Upcast to prevent overflow
                 let abs_fmt = format_immediate!(fmt, abs);
 
                 if abs.is_negative() {

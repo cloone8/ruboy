@@ -2,7 +2,8 @@
 resolver = "2"
 members = [
     "ruboy",
-    "ruboy_lib"
+    "ruboy_lib",
+    "ruboy_binutils"
 ]
 
 [workspace.package]
@@ -23,6 +24,7 @@ log = "0.4.21"
 simplelog = "0.12.2"
 thiserror = "1.0.59"
 clap = { version = "4.5.4", features = ["derive"] }
+anyhow = "1.0.83"
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]

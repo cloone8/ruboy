@@ -19,6 +19,11 @@ jobs:
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
 
+      - name: Publish binutils
+        run: cargo publish --token ${CRATES_TOKEN} -p ruboy_binutils
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
       - name: Publish bin
         run: cargo publish --token ${CRATES_TOKEN} -p ruboy
         env:
