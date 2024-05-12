@@ -1,6 +1,7 @@
 use clap::ValueEnum;
 
 pub mod dasm;
+pub mod romdump;
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum LogLevel {

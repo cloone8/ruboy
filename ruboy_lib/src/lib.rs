@@ -1,14 +1,15 @@
 use cpu::Cpu;
 use memcontroller::MemController;
 
-pub use memcontroller::GBRam;
 pub use memcontroller::BoxedGBRam;
+pub use memcontroller::GBRam;
 pub use memcontroller::InlineGBRam;
 
 mod boot;
 mod cpu;
 pub mod isa;
 mod memcontroller;
+pub mod rom;
 
 pub struct Gameboy<R>
 where
@@ -51,7 +52,7 @@ impl<R: GBRam> Default for Gameboy<R> {
     fn default() -> Self {
         Gameboy {
             cpu: Cpu::new(),
-            mem: MemController::<R>::new()
+            mem: MemController::<R>::new(),
         }
     }
 }
