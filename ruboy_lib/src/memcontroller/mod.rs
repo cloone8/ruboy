@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use crate::{boot, isa::decoder::DecoderReadable};
 
-pub trait GBAllocator: Sized {
-    type Mem<const N: usize>;
+pub trait GBAllocator {
+    type Mem<const N: usize>: Sized;
     fn allocate<const N: usize>() -> Self::Mem<N>;
     fn read<const N: usize>(ram: &Self::Mem<N>, addr: u16) -> u8;
     fn write<const N: usize>(ram: &mut Self::Mem<N>, addr: u16, val: u8);
