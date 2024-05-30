@@ -694,3 +694,40 @@ pub fn decode(mem: &impl DecoderReadable, pc: u16) -> Result<Instruction, Decode
 
     Ok(instr)
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::isa::testutils;
+
+    use super::*;
+
+    #[test]
+    fn all_decode_ok() {
+        for opcode in testutils::legal_instrs() {
+            let result = decode(&opcode.as_slice(), 0x0);
+
+            assert!(result.is_ok(), "Opcode {:?} not decoded!", opcode);
+            assert!(
+                !matches!(result.unwrap(), Instruction::IllegalInstruction(_)),
+                "Opcode {:x?} was decoded as illegal!",
+                opcode
+            );
+        }
+    }
+
+    #[test]
+    fn decode_illegals() {
+        for opcode in testutils::illegal_opcodes() {
+            let result = decode(&[opcode].as_slice(), 0x0);
+
+            assert!(result.is_ok());
+
+            match result.unwrap() {
+                Instruction::IllegalInstruction(illegal_opcode) => {
+                    assert_eq!(opcode, illegal_opcode, "Wrong illegal opcode detected")
+                }
+                _ => panic!("Illegal opcode was decoded"),
+            }
+        }
+    }
+}
