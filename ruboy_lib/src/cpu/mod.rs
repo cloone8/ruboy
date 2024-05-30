@@ -9,6 +9,7 @@ use crate::{isa::*, memcontroller::MemController, GBRam};
 use self::decoder::DecodeError;
 
 pub struct Cpu {
+    cycles_remaining: u8,
     registers: Registers,
 }
 
@@ -30,6 +31,7 @@ macro_rules! instr_todo {
 impl Cpu {
     pub fn new() -> Self {
         Cpu {
+            cycles_remaining: 0,
             registers: Registers::new(),
         }
     }
@@ -133,25 +135,29 @@ impl Cpu {
         val
     }
 
-    fn do_call<T: GBRam>(&mut self, mem: &mut MemController<T>, return_addr: u16, call_addr: u16) {
+    fn do_call(&mut self, mem: &mut MemController<impl GBRam>, return_addr: u16, call_addr: u16) {
         self.do_push16(mem, return_addr);
         self.registers.set_pc(call_addr);
     }
 
-    pub fn run_instruction(
+    pub fn run_cycle(
         &mut self,
         mem: &mut MemController<impl GBRam>,
     ) -> Result<(), InstructionExecutionError> {
+        if self.cycles_remaining != 0 {
+            // Still executing, continue later
+            self.cycles_remaining -= 1;
+            return Ok(());
+        }
+
         log::trace!("Running instruction at 0x{:x}", self.registers.pc());
 
         let instr = decoder::decode(mem, self.registers.pc())?;
 
         log::trace!("Decoded instruction: {}", instr);
 
-        let mut skip_pc_increment = false;
-
-        match instr {
-            Instruction::Nop => {}
+        let jumped = match instr {
+            Instruction::Nop => false,
             Instruction::Stop(_) => instr_todo!(instr),
             Instruction::Halt => instr_todo!(instr),
             Instruction::EI => instr_todo!(instr),
@@ -176,24 +182,36 @@ impl Cpu {
                 self.registers.set_a(xord);
 
                 self.registers.set_flags(xord == 0, false, false, false);
+
+                false
             }
             Instruction::Cmp(_) => instr_todo!(instr),
-            Instruction::Inc(tgt) => match tgt {
-                IncDecTarget::Reg8(reg) => self.set_reg8_value(reg, self.get_reg8_value(reg)),
-                IncDecTarget::Reg16(reg) => self.set_reg16_value(reg, self.get_reg16_value(reg)),
-                IncDecTarget::MemHL => {
-                    let addr = self.registers.hl();
-                    mem.write8(addr, mem.read8(addr) + 1);
-                }
-            },
-            Instruction::Dec(tgt) => match tgt {
-                IncDecTarget::Reg8(reg) => self.set_reg8_value(reg, self.get_reg8_value(reg)),
-                IncDecTarget::Reg16(reg) => self.set_reg16_value(reg, self.get_reg16_value(reg)),
-                IncDecTarget::MemHL => {
-                    let addr = self.registers.hl();
-                    mem.write8(addr, mem.read8(addr) - 1);
-                }
-            },
+            Instruction::Inc(tgt) => {
+                match tgt {
+                    IncDecTarget::Reg8(reg) => self.set_reg8_value(reg, self.get_reg8_value(reg)),
+                    IncDecTarget::Reg16(reg) => {
+                        self.set_reg16_value(reg, self.get_reg16_value(reg))
+                    }
+                    IncDecTarget::MemHL => {
+                        let addr = self.registers.hl();
+                        mem.write8(addr, mem.read8(addr) + 1);
+                    }
+                };
+                false
+            }
+            Instruction::Dec(tgt) => {
+                match tgt {
+                    IncDecTarget::Reg8(reg) => self.set_reg8_value(reg, self.get_reg8_value(reg)),
+                    IncDecTarget::Reg16(reg) => {
+                        self.set_reg16_value(reg, self.get_reg16_value(reg))
+                    }
+                    IncDecTarget::MemHL => {
+                        let addr = self.registers.hl();
+                        mem.write8(addr, mem.read8(addr) - 1);
+                    }
+                };
+                false
+            }
             Instruction::RotLeftCarry(_) => instr_todo!(instr),
             Instruction::RotRightCarry(_) => instr_todo!(instr),
             Instruction::RotLeft(_) => instr_todo!(instr),
@@ -211,6 +229,7 @@ impl Cpu {
                 let is_zero = val & (1 << (bit as usize)) == 0;
 
                 self.registers.set_zero_flag(is_zero);
+                false
             }
             Instruction::Res(_, _) => instr_todo!(instr),
             Instruction::Set(_, _) => instr_todo!(instr),
@@ -224,7 +243,9 @@ impl Cpu {
                 match dst {
                     Ld8Dst::Mem(memloc) => mem.write8(self.memloc_to_addr(memloc), val),
                     Ld8Dst::Reg(reg) => self.set_reg8_value(reg, val),
-                }
+                };
+
+                false
             }
             Instruction::Load16(dst, src) => {
                 let val = match src {
@@ -235,7 +256,9 @@ impl Cpu {
                 match dst {
                     Ld16Dst::Mem(memloc) => mem.write16(self.memloc_to_addr(memloc), val),
                     Ld16Dst::Reg(reg) => self.set_reg16_value(reg, val),
-                }
+                };
+
+                false
             }
             Instruction::LoadAtoHLI => {
                 let val = self.registers.a();
@@ -244,6 +267,8 @@ impl Cpu {
                 mem.write8(addr, val);
 
                 self.registers.set_hl(addr + 1);
+
+                false
             }
             Instruction::LoadAtoHLD => {
                 let val = self.registers.a();
@@ -252,6 +277,8 @@ impl Cpu {
                 mem.write8(addr, val);
 
                 self.registers.set_hl(addr - 1);
+
+                false
             }
             Instruction::LoadHLItoA => instr_todo!(instr),
             Instruction::LoadHLDtoA => instr_todo!(instr),
@@ -259,14 +286,16 @@ impl Cpu {
             Instruction::Jump(_) => instr_todo!(instr),
             Instruction::JumpRel(offset) => {
                 self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset);
-                skip_pc_increment = true;
+                true
             }
             Instruction::JumpHL => instr_todo!(instr),
             Instruction::JumpIf(_, _) => instr_todo!(instr),
             Instruction::JumpRelIf(offset, condition) => {
                 if self.check_condition(condition) {
                     self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset);
-                    skip_pc_increment = true;
+                    true
+                } else {
+                    false
                 }
             }
             Instruction::Call(addr) => {
@@ -275,7 +304,7 @@ impl Cpu {
 
                 self.do_call(mem, return_addr, addr);
 
-                skip_pc_increment = true;
+                true
             }
             Instruction::CallIf(addr, cond) => {
                 if self.check_condition(cond) {
@@ -284,7 +313,9 @@ impl Cpu {
 
                     self.do_call(mem, return_addr, addr);
 
-                    skip_pc_increment = true;
+                    true
+                } else {
+                    false
                 }
             }
             Instruction::Ret => instr_todo!(instr),
@@ -292,10 +323,14 @@ impl Cpu {
             Instruction::RetIf(_) => instr_todo!(instr),
             Instruction::Pop(reg) => {
                 let val = self.do_pop16(mem);
-                self.set_reg16_value(reg, val)
+                self.set_reg16_value(reg, val);
+
+                false
             }
             Instruction::Push(reg) => {
                 self.do_push16(mem, self.get_reg16_value(reg));
+
+                false
             }
             Instruction::DecimalAdjust => instr_todo!(instr),
             Instruction::ComplementAccumulator => instr_todo!(instr),
@@ -307,7 +342,8 @@ impl Cpu {
             }
         };
 
-        if !skip_pc_increment {
+        // Set PC to next instruction, if we didn't jump
+        if !jumped {
             let instr_len = instr.len() as u16;
 
             log::trace!(
@@ -320,6 +356,16 @@ impl Cpu {
             self.registers.set_pc(self.registers.pc() + instr_len);
         } else {
             log::trace!("Skipping PC increment");
+        }
+
+        // Calculate remaining cycles
+        match instr.cycles() {
+            TCycles::Static(cycles) => self.cycles_remaining = cycles - 1,
+            TCycles::Branching { taken, non_taken } => {
+                let actual_cycles = if jumped { taken } else { non_taken };
+
+                self.cycles_remaining = actual_cycles - 1;
+            }
         }
 
         Ok(())
