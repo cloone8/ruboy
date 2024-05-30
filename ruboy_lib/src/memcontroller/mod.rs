@@ -153,7 +153,12 @@ impl<T: GBAllocator> MemController<T> {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
             0xFF50 => {
+                if self.boot_rom_enabled && val != 0 {
+                    log::debug!("Disabling boot ROM");
+                }
+
                 self.boot_rom_enabled = self.boot_rom_enabled && val == 0; // Disable boot-rom if non-zero is written
+
                 Ok(())
             }
             0xFF80.. => panic!("Too high for I/O range"),
