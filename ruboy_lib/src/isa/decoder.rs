@@ -7,7 +7,7 @@ use crate::isa::{
 
 use super::{Bit, PrefArithTarget, RsVec};
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Copy)]
 pub enum DecodeError {
     /// Not enough bytes in the input
     /// slice to properly decode the error

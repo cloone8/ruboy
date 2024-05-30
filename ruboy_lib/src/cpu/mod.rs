@@ -4,7 +4,11 @@ use thiserror::Error;
 
 use registers::Registers;
 
-use crate::{isa::*, memcontroller::MemController, GBRam};
+use crate::{
+    isa::*,
+    memcontroller::{MemController, WriteError},
+    GBAllocator,
+};
 
 use self::decoder::DecodeError;
 
@@ -13,13 +17,16 @@ pub struct Cpu {
     registers: Registers,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, Copy)]
 pub enum InstructionExecutionError {
     #[error("Error during instruction decoding: {0}")]
     Decode(#[from] DecodeError),
 
     #[error("Illegal instruction: {0}")]
     Illegal(u8),
+
+    #[error("Could not write to memory: {0}")]
+    MemWriteError(#[from] WriteError),
 }
 
 macro_rules! instr_todo {
@@ -109,12 +116,16 @@ impl Cpu {
         self.registers.set_pc(jump_addr);
     }
 
-    fn do_push8(&mut self, mem: &mut MemController<impl GBRam>, val: u8) {
+    fn do_push8(
+        &mut self,
+        mem: &mut MemController<impl GBAllocator>,
+        val: u8,
+    ) -> Result<(), WriteError> {
         self.registers.set_sp(self.registers.sp() - 1);
-        mem.write8(self.registers.sp(), val);
+        mem.write8(self.registers.sp(), val)
     }
 
-    fn do_pop8(&mut self, mem: &mut MemController<impl GBRam>) -> u8 {
+    fn do_pop8(&mut self, mem: &mut MemController<impl GBAllocator>) -> u8 {
         let val = mem.read8(self.registers.sp());
 
         self.registers.set_sp(self.registers.sp() + 1);
@@ -122,12 +133,16 @@ impl Cpu {
         val
     }
 
-    fn do_push16(&mut self, mem: &mut MemController<impl GBRam>, val: u16) {
+    fn do_push16(
+        &mut self,
+        mem: &mut MemController<impl GBAllocator>,
+        val: u16,
+    ) -> Result<(), WriteError> {
         self.registers.set_sp(self.registers.sp() - 2);
-        mem.write16(self.registers.sp(), val);
+        mem.write16(self.registers.sp(), val)
     }
 
-    fn do_pop16(&mut self, mem: &mut MemController<impl GBRam>) -> u16 {
+    fn do_pop16(&mut self, mem: &mut MemController<impl GBAllocator>) -> u16 {
         let val = mem.read16(self.registers.sp());
 
         self.registers.set_sp(self.registers.sp() + 2);
@@ -135,14 +150,42 @@ impl Cpu {
         val
     }
 
-    fn do_call(&mut self, mem: &mut MemController<impl GBRam>, return_addr: u16, call_addr: u16) {
-        self.do_push16(mem, return_addr);
+    fn do_call(
+        &mut self,
+        mem: &mut MemController<impl GBAllocator>,
+        return_addr: u16,
+        call_addr: u16,
+    ) -> Result<(), WriteError> {
+        self.do_push16(mem, return_addr)?;
         self.registers.set_pc(call_addr);
+        Ok(())
+    }
+
+    fn get_prefarith_tgt(&self, mem: &MemController<impl GBAllocator>, tgt: PrefArithTarget) -> u8 {
+        match tgt {
+            PrefArithTarget::Reg(reg) => self.get_reg8_value(reg),
+            PrefArithTarget::MemHL => mem.read8(self.registers.hl()),
+        }
+    }
+
+    fn set_prefarith_tgt(
+        &mut self,
+        mem: &mut MemController<impl GBAllocator>,
+        tgt: PrefArithTarget,
+        val: u8,
+    ) -> Result<(), WriteError> {
+        match tgt {
+            PrefArithTarget::Reg(reg) => {
+                self.set_reg8_value(reg, val);
+                Ok(())
+            }
+            PrefArithTarget::MemHL => mem.write8(self.registers.hl(), val),
+        }
     }
 
     pub fn run_cycle(
         &mut self,
-        mem: &mut MemController<impl GBRam>,
+        mem: &mut MemController<impl GBAllocator>,
     ) -> Result<(), InstructionExecutionError> {
         if self.cycles_remaining != 0 {
             // Still executing, continue later
@@ -150,11 +193,11 @@ impl Cpu {
             return Ok(());
         }
 
-        log::trace!("Running instruction at 0x{:x}", self.registers.pc());
+        log::trace!("Decoding instruction at 0x{:x}", self.registers.pc());
 
         let instr = decoder::decode(mem, self.registers.pc())?;
 
-        log::trace!("Decoded instruction: {}", instr);
+        log::debug!("Running 0x{:x}: {}", self.registers.pc(), instr);
 
         let jumped = match instr {
             Instruction::Nop => false,
@@ -194,7 +237,7 @@ impl Cpu {
                     }
                     IncDecTarget::MemHL => {
                         let addr = self.registers.hl();
-                        mem.write8(addr, mem.read8(addr) + 1);
+                        mem.write8(addr, mem.read8(addr) + 1)?;
                     }
                 };
                 false
@@ -207,14 +250,23 @@ impl Cpu {
                     }
                     IncDecTarget::MemHL => {
                         let addr = self.registers.hl();
-                        mem.write8(addr, mem.read8(addr) - 1);
+                        mem.write8(addr, mem.read8(addr) - 1)?;
                     }
                 };
                 false
             }
             Instruction::RotLeftCarry(_) => instr_todo!(instr),
             Instruction::RotRightCarry(_) => instr_todo!(instr),
-            Instruction::RotLeft(_) => instr_todo!(instr),
+            Instruction::RotLeft(tgt) => {
+                let carry_set = self.registers.carry_flag();
+                let cur_val = self.get_prefarith_tgt(mem, tgt);
+                let (shifted, overflown) = cur_val.overflowing_shl(1);
+
+                self.registers.set_carry_flag(overflown);
+                self.set_prefarith_tgt(mem, tgt, shifted | (carry_set as u8))?;
+
+                false
+            }
             Instruction::RotRight(_) => instr_todo!(instr),
             Instruction::ShiftLeftArith(_) => instr_todo!(instr),
             Instruction::ShiftRightArith(_) => instr_todo!(instr),
@@ -241,7 +293,7 @@ impl Cpu {
                 };
 
                 match dst {
-                    Ld8Dst::Mem(memloc) => mem.write8(self.memloc_to_addr(memloc), val),
+                    Ld8Dst::Mem(memloc) => mem.write8(self.memloc_to_addr(memloc), val)?,
                     Ld8Dst::Reg(reg) => self.set_reg8_value(reg, val),
                 };
 
@@ -254,7 +306,7 @@ impl Cpu {
                 };
 
                 match dst {
-                    Ld16Dst::Mem(memloc) => mem.write16(self.memloc_to_addr(memloc), val),
+                    Ld16Dst::Mem(memloc) => mem.write16(self.memloc_to_addr(memloc), val)?,
                     Ld16Dst::Reg(reg) => self.set_reg16_value(reg, val),
                 };
 
@@ -264,7 +316,7 @@ impl Cpu {
                 let val = self.registers.a();
                 let addr = self.registers.hl();
 
-                mem.write8(addr, val);
+                mem.write8(addr, val)?;
 
                 self.registers.set_hl(addr + 1);
 
@@ -274,7 +326,7 @@ impl Cpu {
                 let val = self.registers.a();
                 let addr = self.registers.hl();
 
-                mem.write8(addr, val);
+                mem.write8(addr, val)?;
 
                 self.registers.set_hl(addr - 1);
 
@@ -302,7 +354,7 @@ impl Cpu {
                 let curr_addr = self.registers.pc();
                 let return_addr = curr_addr + (instr.len() as u16);
 
-                self.do_call(mem, return_addr, addr);
+                self.do_call(mem, return_addr, addr)?;
 
                 true
             }
@@ -311,14 +363,19 @@ impl Cpu {
                     let curr_addr = self.registers.pc();
                     let return_addr = curr_addr + (instr.len() as u16);
 
-                    self.do_call(mem, return_addr, addr);
+                    self.do_call(mem, return_addr, addr)?;
 
                     true
                 } else {
                     false
                 }
             }
-            Instruction::Ret => instr_todo!(instr),
+            Instruction::Ret => {
+                let ret_addr = self.do_pop16(mem);
+                self.registers.set_pc(ret_addr);
+
+                true
+            }
             Instruction::Reti => instr_todo!(instr),
             Instruction::RetIf(_) => instr_todo!(instr),
             Instruction::Pop(reg) => {
@@ -328,7 +385,7 @@ impl Cpu {
                 false
             }
             Instruction::Push(reg) => {
-                self.do_push16(mem, self.get_reg16_value(reg));
+                self.do_push16(mem, self.get_reg16_value(reg))?;
 
                 false
             }

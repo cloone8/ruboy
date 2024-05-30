@@ -1,5 +1,5 @@
 use clap::Parser;
-use ruboy_lib::{self, BoxedGBRam, Gameboy};
+use ruboy_lib::{self, Gameboy, StackAllocator};
 
 use crate::args::CLIArgs;
 
@@ -18,12 +18,13 @@ fn main() {
         args.verbosity.into(),
         logconfig,
         simplelog::TerminalMode::Stdout,
-        simplelog::ColorChoice::Auto
-    ).expect("Could not initialize logger");
+        simplelog::ColorChoice::Auto,
+    )
+    .expect("Could not initialize logger");
 
     log::info!("Starting Ruboy Emulator Frontend");
 
-    let mut gameboy = Gameboy::<BoxedGBRam>::new();
+    let mut gameboy = Gameboy::<StackAllocator>::new();
 
     gameboy.start();
 }

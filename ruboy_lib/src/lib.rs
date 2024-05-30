@@ -7,9 +7,9 @@ use std::time::Instant;
 use cpu::Cpu;
 use memcontroller::MemController;
 
-pub use memcontroller::BoxedGBRam;
-pub use memcontroller::GBRam;
-pub use memcontroller::InlineGBRam;
+pub use memcontroller::BoxAllocator;
+pub use memcontroller::GBAllocator;
+pub use memcontroller::StackAllocator;
 
 mod boot;
 mod cpu;
@@ -19,7 +19,7 @@ pub mod rom;
 
 pub struct Gameboy<R>
 where
-    R: GBRam,
+    R: GBAllocator,
 {
     cpu: Cpu,
     mem: MemController<R>,
@@ -71,7 +71,7 @@ impl Display for Frequency {
     }
 }
 
-impl<R: GBRam> Gameboy<R> {
+impl<R: GBAllocator> Gameboy<R> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -79,7 +79,6 @@ impl<R: GBRam> Gameboy<R> {
     pub fn start(&mut self) {
         log::info!("Starting Ruboy Emulator");
 
-        self.load_boot_rom();
         let mut cycles = 0_usize;
         let mut last_second = Instant::now();
 
@@ -97,22 +96,9 @@ impl<R: GBRam> Gameboy<R> {
             }
         }
     }
-
-    #[cfg(feature = "boot_img_enabled")]
-    fn load_boot_rom(&mut self) {
-        log::info!("Boot ROM enabled, using {} image", boot::IMAGE_NAME);
-        log::trace!("Boot ROM has length {}", boot::IMAGE.len());
-
-        for (i, &byte) in boot::IMAGE.iter().enumerate() {
-            self.mem.write8(i as u16, byte);
-        }
-    }
-
-    #[cfg(not(feature = "boot_img_enabled"))]
-    fn load_boot_rom(&mut self) {}
 }
 
-impl<R: GBRam> Default for Gameboy<R> {
+impl<R: GBAllocator> Default for Gameboy<R> {
     fn default() -> Self {
         Gameboy {
             cpu: Cpu::new(),
