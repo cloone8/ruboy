@@ -26,10 +26,14 @@ pub struct MemController<A: GBAllocator, R: RomReader> {
 enum MemRegion {
     BootRom,
     Cartridge,
-    WorkRam,
     VRam,
+    WorkRam,
+    EchoRam,
+    ObjectAttrMem,
+    Prohibited,
     IORegs,
     HighRam,
+    InterruptEnableReg,
 }
 
 impl Display for MemRegion {
@@ -41,6 +45,10 @@ impl Display for MemRegion {
             MemRegion::VRam => "VRAM",
             MemRegion::IORegs => "I/O Registers",
             MemRegion::HighRam => "High RAM",
+            MemRegion::InterruptEnableReg => "Interrup Enable Register",
+            MemRegion::EchoRam => "Echo RAM",
+            MemRegion::ObjectAttrMem => "Object Attribute Memory",
+            MemRegion::Prohibited => "Prohibited",
         };
 
         write!(f, "{}", name)
@@ -99,16 +107,19 @@ impl Display for WriteError {
     }
 }
 
-#[derive(Debug, Clone, Copy, Error)]
+#[derive(Debug, Error)]
 pub enum WriteErrType {
     #[error("Write to read-only memory")]
     ReadOnly,
+
+    #[error("Error during ROM writing: {0}")]
+    Rom(#[from] rom::controller::WriteError),
 }
 
 macro_rules! unimplemented_read {
     ($region:expr) => {{
         log::debug!(
-            "Attempted read at unimplemented region {:?}, returning 0x0",
+            "Attempted read at unimplemented region {}, returning 0x0",
             $region
         );
         Ok(0)
@@ -118,7 +129,7 @@ macro_rules! unimplemented_read {
 macro_rules! unimplemented_write {
     ($region:expr) => {{
         log::debug!(
-            "Attempted write at unimplemented region {:?}, writing nothing",
+            "Attempted write at unimplemented region {}, writing nothing",
             $region
         );
 
@@ -170,10 +181,14 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             }
             0xFF..=0x7FFF => MemRegion::Cartridge,
             0x8000..=0x9FFF => MemRegion::VRam,
+            0xA000..=0xBFFF => MemRegion::Cartridge,
             0xC000..=0xDFFF => MemRegion::WorkRam,
+            0xE000..=0xFDFF => MemRegion::EchoRam,
+            0xFE00..=0xFE9F => MemRegion::ObjectAttrMem,
+            0xFEA0..=0xFEFF => MemRegion::Prohibited,
             0xFF00..=0xFF7F => MemRegion::IORegs,
             0xFF80..=0xFFFE => MemRegion::HighRam,
-            _ => panic!("Unknown memory region at 0x{:x}", addr),
+            0xFFFF => MemRegion::InterruptEnableReg,
         }
     }
 
@@ -181,10 +196,14 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
         match self.map_to_region(addr) {
             MemRegion::BootRom => Ok(boot::IMAGE[addr as usize]),
             MemRegion::Cartridge => self.rom.read(addr).map_err(|e| self.r_err(addr, e)),
-            MemRegion::WorkRam => Ok(A::read(&self.ram, addr - 0xC000)),
             MemRegion::VRam => unimplemented_read!(MemRegion::VRam),
+            MemRegion::WorkRam => Ok(A::read(&self.ram, addr - 0xC000)),
+            MemRegion::EchoRam => unimplemented_read!(MemRegion::EchoRam),
+            MemRegion::ObjectAttrMem => unimplemented_read!(MemRegion::ObjectAttrMem),
+            MemRegion::Prohibited => unimplemented_read!(MemRegion::Prohibited),
             MemRegion::IORegs => Ok(self.io_read(addr)),
             MemRegion::HighRam => unimplemented_read!(MemRegion::HighRam),
+            MemRegion::InterruptEnableReg => unimplemented_read!(MemRegion::InterruptEnableReg),
         }
     }
 
@@ -198,14 +217,18 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
     pub fn write8(&mut self, addr: u16, value: u8) -> Result<(), WriteError> {
         match self.map_to_region(addr) {
             MemRegion::BootRom => Err(self.w_err(addr, WriteErrType::ReadOnly)),
-            MemRegion::Cartridge => unimplemented_write!(MemRegion::Cartridge),
+            MemRegion::Cartridge => self.rom.write(addr, value).map_err(|e| self.w_err(addr, e)),
+            MemRegion::VRam => unimplemented_write!(MemRegion::VRam),
             MemRegion::WorkRam => {
                 A::write(&mut self.ram, addr - 0xC000, value);
                 Ok(())
             }
-            MemRegion::VRam => unimplemented_write!(MemRegion::VRam),
+            MemRegion::EchoRam => unimplemented_write!(MemRegion::EchoRam),
+            MemRegion::ObjectAttrMem => unimplemented_write!(MemRegion::ObjectAttrMem),
+            MemRegion::Prohibited => unimplemented_write!(MemRegion::Prohibited),
             MemRegion::IORegs => self.io_write(addr, value),
             MemRegion::HighRam => unimplemented_write!(MemRegion::HighRam),
+            MemRegion::InterruptEnableReg => unimplemented_write!(MemRegion::InterruptEnableReg),
         }
     }
 
