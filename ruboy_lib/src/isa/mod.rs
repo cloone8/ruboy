@@ -8,7 +8,6 @@ mod len;
 mod testutils;
 
 pub use cycles::*;
-pub use len::*;
 
 #[cfg(feature = "isa_display")]
 pub mod display;

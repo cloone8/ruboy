@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-use allocator::GBAllocator;
+use allocator::{GBAllocator, GBRam};
 use thiserror::Error;
 
 use crate::{
@@ -19,7 +19,7 @@ const WORKRAM_SIZE: usize = 0xDFFF - 0xC000;
 pub struct MemController<A: GBAllocator, R: RomReader> {
     boot_rom_enabled: bool,
     ram: A::Mem<WORKRAM_SIZE>,
-    rom: RomController<R>,
+    rom: RomController<A, R>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -197,7 +197,7 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             MemRegion::BootRom => Ok(boot::IMAGE[addr as usize]),
             MemRegion::Cartridge => self.rom.read(addr).map_err(|e| self.r_err(addr, e)),
             MemRegion::VRam => unimplemented_read!(MemRegion::VRam),
-            MemRegion::WorkRam => Ok(A::read(&self.ram, addr - 0xC000)),
+            MemRegion::WorkRam => Ok(self.ram.read(addr - 0xC000)),
             MemRegion::EchoRam => unimplemented_read!(MemRegion::EchoRam),
             MemRegion::ObjectAttrMem => unimplemented_read!(MemRegion::ObjectAttrMem),
             MemRegion::Prohibited => unimplemented_read!(MemRegion::Prohibited),
@@ -220,7 +220,7 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             MemRegion::Cartridge => self.rom.write(addr, value).map_err(|e| self.w_err(addr, e)),
             MemRegion::VRam => unimplemented_write!(MemRegion::VRam),
             MemRegion::WorkRam => {
-                A::write(&mut self.ram, addr - 0xC000, value);
+                self.ram.write(addr - 0xC000, value);
                 Ok(())
             }
             MemRegion::EchoRam => unimplemented_write!(MemRegion::EchoRam),

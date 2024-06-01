@@ -112,16 +112,15 @@ impl Registers {
     pub const fn sp(&self) -> u16 {
         self.sp
     }
-    
+
     #[inline(always)]
     pub fn set_sp(&mut self, value: u16) {
-        self.sp = value; 
+        self.sp = value;
     }
 }
 
 /// Combined "virtual" registers
 impl Registers {
-    
     #[inline(always)]
     pub const fn af(&self) -> u16 {
         ((self.a as u16) << 8) | (self.f as u16)
@@ -191,7 +190,6 @@ macro_rules! set_flag {
 
 /// Flag register operations
 impl Registers {
-    
     #[inline(always)]
     pub const fn zero_flag(&self) -> bool {
         get_flag!(7, self)

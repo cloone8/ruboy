@@ -1,53 +1,71 @@
+use std::marker::PhantomData;
+
 use nonbanking::NonBankingController;
 use thiserror::Error;
 
+use crate::allocator::GBAllocator;
+
 use super::{
     meta::{RomMeta, RomMetaParseError},
-    RomReadErr, RomReader,
+    RomReader,
 };
 
 mod nonbanking;
 
-#[derive(Debug, Error)]
-pub enum MbcReadErr {}
-
-#[derive(Debug, Error)]
-pub enum MbcWriteErr {}
-
-trait Mbc<R: RomReader> {
-    fn read(&self, addr: u16) -> Result<u8, MbcReadErr>;
-    fn write(&mut self, addr: u16, val: u8) -> Result<(), MbcWriteErr>;
+trait Mbc {
+    fn read(&self, addr: u16) -> Result<u8, ReadError>;
+    fn write(&mut self, addr: u16, val: u8) -> Result<(), WriteError>;
 }
 
 #[derive(Debug)]
-enum MemBankController<R: RomReader> {
-    None(NonBankingController<R>),
+#[allow(unused_associated_type_bounds)]
+pub enum RomController<A: GBAllocator, R: RomReader> {
+    None(NonBankingController<A>),
+    // TODO: Remove when an actual variant that uses R is introduced
+    Phantom(PhantomData<R>),
 }
 
-impl<R: RomReader> Mbc<R> for MemBankController<R> {
-    fn read(&self, addr: u16) -> Result<u8, MbcReadErr> {
-        match self {
-            MemBankController::None(c) => c.read(addr),
-        }
+impl<A: GBAllocator, R: RomReader> RomController<A, R> {
+    pub fn new(mut rom: R) -> Result<Self, RomControllerInitErr<R>> {
+        let header_bytes: [u8; RomMeta::HEADER_LENGTH] = rom
+            .read(RomMeta::OFFSET_HEADER_START)
+            .map_err(|e| RomControllerInitErr::Read(e))?;
+
+        let meta = RomMeta::parse(&header_bytes)?;
+
+        let controller = match meta.cartridge_hardware().mapper() {
+            Some(mapper) => todo!("MBC not yet implemented: {}", mapper),
+            None => RomController::None(
+                NonBankingController::new(meta, rom).map_err(|e| RomControllerInitErr::Read(e))?,
+            ),
+        };
+
+        Ok(controller)
     }
 
-    fn write(&mut self, addr: u16, val: u8) -> Result<(), MbcWriteErr> {
-        match self {
-            MemBankController::None(c) => c.write(addr, val),
-        }
-    }
-}
+    pub fn read(&self, addr: u16) -> Result<u8, ReadError> {
+        let result = match self {
+            RomController::None(c) => c.read(addr)?,
+            RomController::Phantom(_) => todo!(),
+        };
 
-#[derive(Debug)]
-pub struct RomController<R: RomReader> {
-    meta: RomMeta,
-    controller: MemBankController<R>,
+        Ok(result)
+    }
+
+    pub fn write(&mut self, addr: u16, val: u8) -> Result<(), WriteError> {
+        match self {
+            RomController::None(c) => c.write(addr, val)?,
+            RomController::Phantom(_) => todo!(),
+        };
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Error)]
 pub enum RomControllerInitErr<R: RomReader> {
     #[error("Error reading ROM file: {0}")]
-    Read(#[from] RomReadErr<R::Err>),
+    Read(#[source] R::Err),
 
     #[error("Error parsing ROM file: {0}")]
     Parse(#[from] RomMetaParseError),
@@ -55,34 +73,15 @@ pub enum RomControllerInitErr<R: RomReader> {
 
 #[derive(Debug, Error)]
 pub enum ReadError {
-    #[error("MBC returned error during read: {0}")]
-    Mbc(#[from] MbcReadErr),
+    #[error("RAM address {addr} out of reach for this cartridge (max {max})")]
+    NotEnoughRam { addr: u16, max: u16 },
 }
 
 #[derive(Debug, Error)]
 pub enum WriteError {
-    #[error("MBC returned error during write: {0}")]
-    Mbc(#[from] MbcWriteErr),
-}
+    #[error("RAM address {addr} out of reach for this cartridge (max {max})")]
+    NotEnoughRam { addr: u16, max: u16 },
 
-impl<R: RomReader> RomController<R> {
-    pub fn new(mut rom: R) -> Result<Self, RomControllerInitErr<R>> {
-        let header_bytes: [u8; RomMeta::HEADER_LENGTH] = rom.read(RomMeta::OFFSET_HEADER_START)?;
-        let meta = RomMeta::parse(&header_bytes)?;
-
-        let controller = match meta.cartridge_hardware().mapper() {
-            Some(mapper) => todo!("MBC not yet implemented: {}", mapper),
-            None => MemBankController::None(NonBankingController::new(rom)),
-        };
-
-        Ok(Self { meta, controller })
-    }
-
-    pub fn read(&self, addr: u16) -> Result<u8, ReadError> {
-        self.controller.read(addr).map_err(ReadError::from)
-    }
-
-    pub fn write(&mut self, addr: u16, value: u8) -> Result<(), WriteError> {
-        self.controller.write(addr, value).map_err(WriteError::from)
-    }
+    #[error("Address is read only: {0}")]
+    ReadOnly(u16),
 }

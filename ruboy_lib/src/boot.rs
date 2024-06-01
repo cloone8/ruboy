@@ -3,14 +3,14 @@ use cfg_if::cfg_if;
 #[cfg(target_os = "windows")]
 macro_rules! path_sep {
     () => {
-        "\\" 
+        "\\"
     };
 }
 
 #[cfg(not(target_os = "windows"))]
 macro_rules! path_sep {
     () => {
-        "/" 
+        "/"
     };
 }
 
@@ -26,4 +26,3 @@ cfg_if! {
         pub const IMAGE: &'static [u8] = include_bytes!(concat!("..", path_sep!(), "boot", path_sep!(), "mgb.bin"));
     }
 }
-

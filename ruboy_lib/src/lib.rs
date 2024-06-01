@@ -1,6 +1,4 @@
-use std::clone;
 use std::error::Error;
-use std::fmt::write;
 use std::fmt::Display;
 use std::time::Duration;
 use std::time::Instant;
@@ -56,7 +54,7 @@ impl Frequency {
                 Frequency::None(x) => Frequency::Kilo(x / 1000.0).upcast(),
                 Frequency::Kilo(x) => Frequency::Mega(x / 1000.0).upcast(),
                 Frequency::Mega(x) => Frequency::Giga(x / 1000.0).upcast(),
-                Frequency::Giga(x) => self,
+                Frequency::Giga(_) => self,
             }
         } else {
             self
