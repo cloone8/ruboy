@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use ruboy_binutils::cli::dasm;
+use ruboy_binutils::{cli::dasm, ListOutput};
 use ruboy_lib::isa::{
     decoder::{decode, DecoderReadable},
     Instruction,
@@ -54,9 +54,13 @@ fn display_output(instructions: &HashMap<usize, Instruction>) {
 
     sorted.sort_by(|x, y| usize::cmp(&x.0, &y.0));
 
+    let mut output = ListOutput::new();
+
     for (addr, instr) in sorted {
-        println!("0x{:x}\t\t{}", addr, instr);
+        output.add_single(format!("0x{:x}", addr), instr);
     }
+
+    println!("{}", output);
 }
 
 fn main() -> Result<()> {
