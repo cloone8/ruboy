@@ -14,6 +14,8 @@ pub struct NonBankingController<A: GBAllocator> {
 
 impl<A: GBAllocator> NonBankingController<A> {
     pub fn new<R: RomReader>(meta: RomMeta, mut reader: R) -> Result<Self, R::Err> {
+        log::info!("Initializing non-banking (MBC0) ROM mapper");
+
         let mut new = Self {
             meta,
             rom_content: A::allocate(),

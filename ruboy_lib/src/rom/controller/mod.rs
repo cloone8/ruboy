@@ -27,11 +27,15 @@ pub enum RomController<A: GBAllocator, R: RomReader> {
 
 impl<A: GBAllocator, R: RomReader> RomController<A, R> {
     pub fn new(mut rom: R) -> Result<Self, RomControllerInitErr<R>> {
+        log::debug!("Initializing ROM controller");
+
         let header_bytes: [u8; RomMeta::HEADER_LENGTH] = rom
             .read(RomMeta::OFFSET_HEADER_START)
             .map_err(|e| RomControllerInitErr::Read(e))?;
 
         let meta = RomMeta::parse(&header_bytes)?;
+
+        log::debug!("Resolving ROM mapper type");
 
         let controller = match meta.cartridge_hardware().mapper() {
             Some(mapper) => todo!("MBC not yet implemented: {}", mapper),

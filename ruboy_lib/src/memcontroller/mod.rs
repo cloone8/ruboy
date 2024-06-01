@@ -145,6 +145,8 @@ pub enum MemControllerInitErr<R: RomReader> {
 
 impl<A: GBAllocator, R: RomReader> MemController<A, R> {
     pub fn new(rom: R) -> Result<Self, MemControllerInitErr<R>> {
+        log::debug!("Initializing memory controller");
+
         Ok(MemController {
             boot_rom_enabled: cfg!(feature = "boot_img_enabled"),
             ram: A::allocate::<WORKRAM_SIZE>(),
