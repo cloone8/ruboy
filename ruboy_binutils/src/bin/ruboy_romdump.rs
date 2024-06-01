@@ -1,4 +1,5 @@
 use std::{
+    fmt::format,
     fs::File,
     io::{BufReader, Read, Seek},
 };
@@ -6,8 +7,8 @@ use std::{
 use anyhow::{Context, Result};
 use clap::Parser;
 use colored::*;
-use ruboy_binutils::cli::romdump;
-use ruboy_lib::rom::{CartridgeHardware, RomMeta};
+use ruboy_binutils::{cli::romdump, ListOutput};
+use ruboy_lib::rom::meta::RomMeta;
 
 fn seek_to_header_start(r: &mut BufReader<File>) -> Result<()> {
     let cur_pos = r
@@ -31,50 +32,58 @@ fn generate_checksum_string(valid: bool) -> ColoredString {
     }
 }
 
-#[rustfmt::skip]
 fn display_rom_meta(meta: &RomMeta) {
-    println!("Title:                 {}", meta.title());
-    println!("Manufacturer:          {}", meta.manufacturer());
-    println!("CGB support:           {}", meta.cgb_support());
-    println!("Licensee:              {}", meta.licensee());
-    println!("SGB Support:           {}", meta.sgb_support());
+    let mut output = ListOutput::new();
+    output.add_single("Title", meta.title());
+    output.add_single("Manufacturer", meta.manufacturer());
+    output.add_single("CGB Support", meta.cgb_support());
+    output.add_single("Licensee", meta.licensee());
+    output.add_single("SGB Support", meta.sgb_support());
 
-    println!("Cartridge hardware:");
     let hw = meta.cartridge_hardware();
 
+    let mut hw_strs: Vec<String> = Vec::new();
+
     if let Some(mapper) = hw.mapper() {
-        println!("                       - Mapper: {}", mapper);
+        hw_strs.push(format!("Mapper: {}", mapper));
     }
 
     if hw.has_ram() {
-        println!("                       - RAM");
+        hw_strs.push("RAM".into());
     }
     if hw.has_battery() {
-        println!("                       - Battery");
+        hw_strs.push("Battery".into());
     }
     if hw.has_timer() {
-        println!("                       - Timer");
+        hw_strs.push("Timer".into());
     }
     if hw.has_rumble() {
-        println!("                       - Rumble");
+        hw_strs.push("Rumble".into());
     }
     if hw.has_sensor() {
-        println!("                       - Sensor");
+        hw_strs.push("Sensor".into());
     }
     if hw.has_camera() {
-        println!("                       - Camera");
+        hw_strs.push("Camera".into());
     }
 
-    println!("ROM size:              {}", meta.rom_size());
-    println!("RAM size:              {}", meta.ram_size());
-    println!("Intented destination:  {}", meta.destination());
-    println!("Game version number:   {}", meta.game_version());
-    println!(
-             "Header checksum:       0x{:x} ({})",
-             meta.header_checksum(),
-             generate_checksum_string(meta.header_checksum_valid())
+    output.add_multiple("Cartridge hardware", hw_strs);
+
+    output.add_single("ROM size", meta.rom_size());
+    output.add_single("RAM size", meta.ram_size());
+    output.add_single("Intended destination", meta.destination());
+    output.add_single("Game version number", meta.game_version());
+    output.add_single(
+        "Header checksum",
+        format!(
+            "0x{:x} ({})",
+            meta.header_checksum(),
+            generate_checksum_string(meta.header_checksum_valid())
+        ),
     );
-    println!("Global checksum:       0x{:x}", meta.global_checksum());
+    output.add_single("Global checksum", format!("0x{:x}", meta.global_checksum()));
+
+    println!("{}", output);
 }
 
 fn main() -> Result<()> {

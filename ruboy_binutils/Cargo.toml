@@ -18,3 +18,4 @@ log.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 colored.workspace = true
+unicode-width.workspace = true

@@ -5,11 +5,10 @@ use std::time::Duration;
 use std::time::Instant;
 
 use cpu::Cpu;
+use memcontroller::allocator::GBAllocator;
 use memcontroller::MemController;
 
-pub use memcontroller::BoxAllocator;
-pub use memcontroller::GBAllocator;
-pub use memcontroller::StackAllocator;
+pub use memcontroller::allocator;
 
 mod boot;
 mod cpu;

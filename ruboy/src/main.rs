@@ -1,5 +1,6 @@
 use clap::Parser;
-use ruboy_lib::{self, Gameboy, StackAllocator};
+use ruboy_lib::allocator::StackAllocator;
+use ruboy_lib::Gameboy;
 
 use crate::args::CLIArgs;
 

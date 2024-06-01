@@ -1,53 +1,14 @@
+use allocator::GBAllocator;
 use thiserror::Error;
 
 use crate::{boot, isa::decoder::DecoderReadable};
+pub mod allocator;
 
-pub trait GBAllocator {
-    type Mem<const N: usize>: Sized;
-    fn allocate<const N: usize>() -> Self::Mem<N>;
-    fn read<const N: usize>(ram: &Self::Mem<N>, addr: u16) -> u8;
-    fn write<const N: usize>(ram: &mut Self::Mem<N>, addr: u16, val: u8);
-}
-
-pub struct StackAllocator;
-
-impl GBAllocator for StackAllocator {
-    type Mem<const N: usize> = [u8; N];
-
-    fn allocate<const N: usize>() -> Self::Mem<N> {
-        [0; N]
-    }
-
-    fn read<const N: usize>(ram: &Self::Mem<N>, addr: u16) -> u8 {
-        ram[addr as usize]
-    }
-
-    fn write<const N: usize>(ram: &mut Self::Mem<N>, addr: u16, val: u8) {
-        ram[addr as usize] = val;
-    }
-}
-
-pub struct BoxAllocator;
-
-impl GBAllocator for BoxAllocator {
-    type Mem<const N: usize> = Box<[u8; N]>;
-
-    fn allocate<const N: usize>() -> Self::Mem<N> {
-        Box::new([0; N])
-    }
-
-    fn read<const N: usize>(ram: &Self::Mem<N>, addr: u16) -> u8 {
-        ram[addr as usize]
-    }
-
-    fn write<const N: usize>(ram: &mut Self::Mem<N>, addr: u16, val: u8) {
-        ram[addr as usize] = val
-    }
-}
+const WORKRAM_SIZE: usize = 0xDFFF - 0xC000;
 
 pub struct MemController<T: GBAllocator> {
     boot_rom_enabled: bool,
-    ram: T::Mem<{ u16::MAX as usize }>,
+    ram: T::Mem<WORKRAM_SIZE>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -91,7 +52,7 @@ impl<T: GBAllocator> MemController<T> {
     pub fn new() -> Self {
         MemController {
             boot_rom_enabled: cfg!(feature = "boot_img_enabled"),
-            ram: T::allocate::<{ u16::MAX as usize }>(),
+            ram: T::allocate::<WORKRAM_SIZE>(),
         }
     }
 
@@ -117,7 +78,7 @@ impl<T: GBAllocator> MemController<T> {
         match self.map_to_region(addr) {
             MemRegion::BootRom => boot::IMAGE[addr as usize],
             MemRegion::Cartridge => unimplemented_read!(MemRegion::Cartridge),
-            MemRegion::WorkRam => T::read(&self.ram, addr),
+            MemRegion::WorkRam => T::read(&self.ram, addr - 0xC000),
             MemRegion::VRam => unimplemented_read!(MemRegion::VRam),
             MemRegion::IORegs => self.io_read(addr),
             MemRegion::HighRam => unimplemented_read!(MemRegion::HighRam),
@@ -133,7 +94,7 @@ impl<T: GBAllocator> MemController<T> {
             MemRegion::BootRom => Err(WriteError::ReadOnly(addr)),
             MemRegion::Cartridge => unimplemented_write!(MemRegion::Cartridge),
             MemRegion::WorkRam => {
-                T::write(&mut self.ram, addr, value);
+                T::write(&mut self.ram, addr - 0xC000, value);
                 Ok(())
             }
             MemRegion::VRam => unimplemented_write!(MemRegion::VRam),
