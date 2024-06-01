@@ -1,14 +1,23 @@
 use allocator::GBAllocator;
 use thiserror::Error;
 
-use crate::{boot, isa::decoder::DecoderReadable};
+use crate::{
+    boot,
+    isa::decoder::DecoderReadable,
+    rom::{
+        controller::{RomController, RomControllerInitErr},
+        meta::RomMetaParseError,
+        RomReader,
+    },
+};
 pub mod allocator;
 
 const WORKRAM_SIZE: usize = 0xDFFF - 0xC000;
 
-pub struct MemController<T: GBAllocator> {
+pub struct MemController<A: GBAllocator, R: RomReader> {
     boot_rom_enabled: bool,
-    ram: T::Mem<WORKRAM_SIZE>,
+    ram: A::Mem<WORKRAM_SIZE>,
+    rom: RomController<R>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -48,12 +57,19 @@ macro_rules! unimplemented_write {
     }};
 }
 
-impl<T: GBAllocator> MemController<T> {
-    pub fn new() -> Self {
-        MemController {
+#[derive(Debug, Error)]
+pub enum MemControllerInitErr<R: RomReader> {
+    #[error("Could not initialize ROM controller: {0}")]
+    Rom(#[from] RomControllerInitErr<R>),
+}
+
+impl<A: GBAllocator, R: RomReader> MemController<A, R> {
+    pub fn new(rom: R) -> Result<Self, MemControllerInitErr<R>> {
+        Ok(MemController {
             boot_rom_enabled: cfg!(feature = "boot_img_enabled"),
-            ram: T::allocate::<WORKRAM_SIZE>(),
-        }
+            ram: A::allocate::<WORKRAM_SIZE>(),
+            rom: RomController::new(rom)?,
+        })
     }
 
     fn map_to_region(&self, addr: u16) -> MemRegion {
@@ -78,7 +94,7 @@ impl<T: GBAllocator> MemController<T> {
         match self.map_to_region(addr) {
             MemRegion::BootRom => boot::IMAGE[addr as usize],
             MemRegion::Cartridge => unimplemented_read!(MemRegion::Cartridge),
-            MemRegion::WorkRam => T::read(&self.ram, addr - 0xC000),
+            MemRegion::WorkRam => A::read(&self.ram, addr - 0xC000),
             MemRegion::VRam => unimplemented_read!(MemRegion::VRam),
             MemRegion::IORegs => self.io_read(addr),
             MemRegion::HighRam => unimplemented_read!(MemRegion::HighRam),
@@ -94,7 +110,7 @@ impl<T: GBAllocator> MemController<T> {
             MemRegion::BootRom => Err(WriteError::ReadOnly(addr)),
             MemRegion::Cartridge => unimplemented_write!(MemRegion::Cartridge),
             MemRegion::WorkRam => {
-                T::write(&mut self.ram, addr - 0xC000, value);
+                A::write(&mut self.ram, addr - 0xC000, value);
                 Ok(())
             }
             MemRegion::VRam => unimplemented_write!(MemRegion::VRam),
@@ -142,7 +158,7 @@ impl<T: GBAllocator> MemController<T> {
     }
 }
 
-impl<T: GBAllocator> DecoderReadable for MemController<T> {
+impl<A: GBAllocator, R: RomReader> DecoderReadable for MemController<A, R> {
     fn read_at(&self, idx: usize) -> Option<u8> {
         match u16::try_from(idx) {
             Ok(addr) => Some(self.read8(addr)),

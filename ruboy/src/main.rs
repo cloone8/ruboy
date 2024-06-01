@@ -1,3 +1,7 @@
+use std::fs::File;
+use std::io::BufReader;
+
+use anyhow::{Context, Result};
 use clap::Parser;
 use ruboy_lib::allocator::StackAllocator;
 use ruboy_lib::Gameboy;
@@ -6,7 +10,7 @@ use crate::args::CLIArgs;
 
 mod args;
 
-fn main() {
+fn main() -> Result<()> {
     let args = CLIArgs::parse();
 
     let logconfig = simplelog::ConfigBuilder::new()
@@ -25,7 +29,13 @@ fn main() {
 
     log::info!("Starting Ruboy Emulator Frontend");
 
-    let mut gameboy = Gameboy::<StackAllocator>::new();
+    let romfile = File::open(args.rom).context("Could not open file at provided path")?;
+    let reader = BufReader::new(romfile);
+
+    let gameboy =
+        Gameboy::<StackAllocator, _>::new(reader).context("Could not initialize Gaemboy")?;
 
     gameboy.start();
+
+    Ok(())
 }

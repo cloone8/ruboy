@@ -207,6 +207,7 @@ dependencies = [
 name = "ruboy"
 version = "0.1.1"
 dependencies = [
+ "anyhow",
  "clap",
  "log",
  "ruboy_lib",

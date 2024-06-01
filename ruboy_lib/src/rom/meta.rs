@@ -230,7 +230,7 @@ impl RomMeta {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, Copy)]
 pub enum RomMetaParseError {
     #[error("Too few input bytes: {0}, wanted {1}")]
     TooShort(usize, usize),

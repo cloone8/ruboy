@@ -1,8 +1,12 @@
+use std::path::PathBuf;
+
 use clap::{Args, Parser, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[command(author, about, version)]
 pub(crate) struct CLIArgs {
+    pub rom: PathBuf,
+
     /// The verbosity of the logger
     #[cfg(not(debug_assertions))]
     #[arg(value_enum, short, long, default_value_t = LogLevel::Warn)]

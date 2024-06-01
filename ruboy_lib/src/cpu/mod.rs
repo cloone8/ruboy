@@ -7,6 +7,7 @@ use registers::Registers;
 use crate::{
     isa::*,
     memcontroller::{MemController, WriteError},
+    rom::RomReader,
     GBAllocator,
 };
 
@@ -118,14 +119,14 @@ impl Cpu {
 
     fn do_push8(
         &mut self,
-        mem: &mut MemController<impl GBAllocator>,
+        mem: &mut MemController<impl GBAllocator, impl RomReader>,
         val: u8,
     ) -> Result<(), WriteError> {
         self.registers.set_sp(self.registers.sp() - 1);
         mem.write8(self.registers.sp(), val)
     }
 
-    fn do_pop8(&mut self, mem: &mut MemController<impl GBAllocator>) -> u8 {
+    fn do_pop8(&mut self, mem: &mut MemController<impl GBAllocator, impl RomReader>) -> u8 {
         let val = mem.read8(self.registers.sp());
 
         self.registers.set_sp(self.registers.sp() + 1);
@@ -135,14 +136,14 @@ impl Cpu {
 
     fn do_push16(
         &mut self,
-        mem: &mut MemController<impl GBAllocator>,
+        mem: &mut MemController<impl GBAllocator, impl RomReader>,
         val: u16,
     ) -> Result<(), WriteError> {
         self.registers.set_sp(self.registers.sp() - 2);
         mem.write16(self.registers.sp(), val)
     }
 
-    fn do_pop16(&mut self, mem: &mut MemController<impl GBAllocator>) -> u16 {
+    fn do_pop16(&mut self, mem: &mut MemController<impl GBAllocator, impl RomReader>) -> u16 {
         let val = mem.read16(self.registers.sp());
 
         self.registers.set_sp(self.registers.sp() + 2);
@@ -152,7 +153,7 @@ impl Cpu {
 
     fn do_call(
         &mut self,
-        mem: &mut MemController<impl GBAllocator>,
+        mem: &mut MemController<impl GBAllocator, impl RomReader>,
         return_addr: u16,
         call_addr: u16,
     ) -> Result<(), WriteError> {
@@ -161,7 +162,11 @@ impl Cpu {
         Ok(())
     }
 
-    fn get_prefarith_tgt(&self, mem: &MemController<impl GBAllocator>, tgt: PrefArithTarget) -> u8 {
+    fn get_prefarith_tgt(
+        &self,
+        mem: &MemController<impl GBAllocator, impl RomReader>,
+        tgt: PrefArithTarget,
+    ) -> u8 {
         match tgt {
             PrefArithTarget::Reg(reg) => self.get_reg8_value(reg),
             PrefArithTarget::MemHL => mem.read8(self.registers.hl()),
@@ -170,7 +175,7 @@ impl Cpu {
 
     fn set_prefarith_tgt(
         &mut self,
-        mem: &mut MemController<impl GBAllocator>,
+        mem: &mut MemController<impl GBAllocator, impl RomReader>,
         tgt: PrefArithTarget,
         val: u8,
     ) -> Result<(), WriteError> {
@@ -185,7 +190,7 @@ impl Cpu {
 
     pub fn run_cycle(
         &mut self,
-        mem: &mut MemController<impl GBAllocator>,
+        mem: &mut MemController<impl GBAllocator, impl RomReader>,
     ) -> Result<(), InstructionExecutionError> {
         if self.cycles_remaining != 0 {
             // Still executing, continue later

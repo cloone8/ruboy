@@ -9,6 +9,9 @@ use memcontroller::allocator::GBAllocator;
 use memcontroller::MemController;
 
 pub use memcontroller::allocator;
+use memcontroller::MemControllerInitErr;
+use rom::RomReader;
+use thiserror::Error;
 
 mod boot;
 mod cpu;
@@ -16,12 +19,13 @@ pub mod isa;
 mod memcontroller;
 pub mod rom;
 
-pub struct Gameboy<R>
+pub struct Gameboy<A, R>
 where
-    R: GBAllocator,
+    A: GBAllocator,
+    R: RomReader,
 {
     cpu: Cpu,
-    mem: MemController<R>,
+    mem: MemController<A, R>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -70,12 +74,21 @@ impl Display for Frequency {
     }
 }
 
-impl<R: GBAllocator> Gameboy<R> {
-    pub fn new() -> Self {
-        Self::default()
+#[derive(Debug, Error)]
+pub enum GameboyStartErr<R: RomReader> {
+    #[error("Could not initialize memory controller: {0}")]
+    MemController(#[from] MemControllerInitErr<R>),
+}
+
+impl<A: GBAllocator, R: RomReader> Gameboy<A, R> {
+    pub fn new(rom: R) -> Result<Self, GameboyStartErr<R>> {
+        Ok(Self {
+            cpu: Cpu::new(),
+            mem: MemController::new(rom)?,
+        })
     }
 
-    pub fn start(&mut self) {
+    pub fn start(mut self) {
         log::info!("Starting Ruboy Emulator");
 
         let mut cycles = 0_usize;
@@ -93,15 +106,6 @@ impl<R: GBAllocator> Gameboy<R> {
                 cycles = 0;
                 last_second = Instant::now();
             }
-        }
-    }
-}
-
-impl<R: GBAllocator> Default for Gameboy<R> {
-    fn default() -> Self {
-        Gameboy {
-            cpu: Cpu::new(),
-            mem: MemController::<R>::new(),
         }
     }
 }
