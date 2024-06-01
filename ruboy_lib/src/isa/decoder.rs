@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use thiserror::Error;
 
 use crate::isa::{
@@ -86,7 +88,7 @@ macro_rules! cmp_reg {
         Instruction::Cmp(ArithSrc::Reg(Reg8::$src))
     };
 }
-const fn decode_prefixed(instr: u8) -> Result<Instruction, DecodeError> {
+const fn decode_prefixed(instr: u8) -> Instruction {
     let instr = match instr {
         //TODO: Jesus Christ, proc macro time.
         0x00 => Instruction::RotLeftCarry(PrefArithTarget::Reg(Reg8::B)),
@@ -347,35 +349,33 @@ const fn decode_prefixed(instr: u8) -> Result<Instruction, DecodeError> {
         0xFF => Instruction::Set(Bit::B7, PrefArithTarget::Reg(Reg8::A)),
     };
 
-    Ok(instr)
+    instr
 }
 
 pub trait DecoderReadable {
-    fn read_at(&self, idx: usize) -> Option<u8>;
+    type Err;
+    fn read_at(&self, idx: usize) -> Result<u8, Self::Err>;
 }
 
 impl DecoderReadable for &[u8] {
-    fn read_at(&self, idx: usize) -> Option<u8> {
-        self.get(idx).cloned()
+    type Err = DecodeError;
+    fn read_at(&self, idx: usize) -> Result<u8, Self::Err> {
+        self.get(idx).cloned().ok_or(DecodeError::NotEnoughBytes)
     }
 }
 
-fn read8(mem: &impl DecoderReadable, idx: u16) -> Result<u8, DecodeError> {
-    mem.read_at(idx as usize).ok_or(DecodeError::NotEnoughBytes)
+fn read8<T: DecoderReadable>(mem: &T, idx: u16) -> Result<u8, T::Err> {
+    mem.read_at(idx as usize)
 }
 
-fn read16(mem: &impl DecoderReadable, idx: u16) -> Result<u16, DecodeError> {
-    let b1 = mem
-        .read_at(idx as usize)
-        .ok_or(DecodeError::NotEnoughBytes)?;
-    let b2 = mem
-        .read_at((idx + 1) as usize)
-        .ok_or(DecodeError::NotEnoughBytes)?;
+fn read16<T: DecoderReadable>(mem: &T, idx: u16) -> Result<u16, T::Err> {
+    let b1 = mem.read_at(idx as usize)?;
+    let b2 = mem.read_at((idx + 1) as usize)?;
 
     Ok(u16::from_le_bytes([b1, b2]))
 }
 
-pub fn decode(mem: &impl DecoderReadable, pc: u16) -> Result<Instruction, DecodeError> {
+pub fn decode<T: DecoderReadable>(mem: &T, pc: u16) -> Result<Instruction, T::Err> {
     let opcode = read8(mem, pc)?;
 
     let instr = match opcode {
@@ -613,7 +613,7 @@ pub fn decode(mem: &impl DecoderReadable, pc: u16) -> Result<Instruction, Decode
         0xC8 => Instruction::RetIf(Condition::Zero),
         0xC9 => Instruction::Ret,
         0xCA => Instruction::JumpIf(read16(mem, pc + 1)?, Condition::Zero),
-        0xCB => decode_prefixed(read8(mem, pc + 1)?)?, // Special instruction, maps to another instruction set
+        0xCB => decode_prefixed(read8(mem, pc + 1)?), // Special instruction, maps to another instruction set
         0xCC => Instruction::CallIf(read16(mem, pc + 1)?, Condition::Zero),
         0xCD => Instruction::Call(read16(mem, pc + 1)?),
         0xCE => Instruction::AddCarry(ArithSrc::Imm(read8(mem, pc + 1)?)),

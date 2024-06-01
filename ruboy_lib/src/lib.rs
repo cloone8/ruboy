@@ -1,4 +1,5 @@
 use std::clone;
+use std::error::Error;
 use std::fmt::write;
 use std::fmt::Display;
 use std::time::Duration;
@@ -88,14 +89,14 @@ impl<A: GBAllocator, R: RomReader> Gameboy<A, R> {
         })
     }
 
-    pub fn start(mut self) {
+    pub fn start(mut self) -> Result<(), Box<dyn Error>> {
         log::info!("Starting Ruboy Emulator");
 
         let mut cycles = 0_usize;
         let mut last_second = Instant::now();
 
         loop {
-            self.cpu.run_cycle(&mut self.mem).unwrap();
+            self.cpu.run_cycle(&mut self.mem)?;
             cycles += 1;
 
             let elapsed_time = last_second.elapsed();

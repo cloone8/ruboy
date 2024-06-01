@@ -1,3 +1,5 @@
+use std::{error::Error, fmt::Display};
+
 use allocator::GBAllocator;
 use thiserror::Error;
 
@@ -5,8 +7,8 @@ use crate::{
     boot,
     isa::decoder::DecoderReadable,
     rom::{
+        self,
         controller::{RomController, RomControllerInitErr},
-        meta::RomMetaParseError,
         RomReader,
     },
 };
@@ -30,10 +32,77 @@ enum MemRegion {
     HighRam,
 }
 
+impl Display for MemRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            MemRegion::BootRom => "Boot ROM",
+            MemRegion::Cartridge => "Cartridge",
+            MemRegion::WorkRam => "Working RAM",
+            MemRegion::VRam => "VRAM",
+            MemRegion::IORegs => "I/O Registers",
+            MemRegion::HighRam => "High RAM",
+        };
+
+        write!(f, "{}", name)
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum ReadErrType {
+    #[error("Error during ROM reading: {0}")]
+    Rom(#[from] rom::controller::ReadError),
+}
+
+#[derive(Debug)]
+pub struct ReadError {
+    addr: u16,
+    region: MemRegion,
+    err: ReadErrType,
+}
+
+impl Error for ReadError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.err)
+    }
+}
+
+impl Display for ReadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Error during memory read at 0x{:x} in region {}: {}",
+            self.addr, self.region, self.err
+        )
+    }
+}
+
+#[derive(Debug)]
+pub struct WriteError {
+    addr: u16,
+    region: MemRegion,
+    err: WriteErrType,
+}
+
+impl Error for WriteError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.err)
+    }
+}
+
+impl Display for WriteError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Error during memory read at 0x{:x} in region {}: {}",
+            self.addr, self.region, self.err
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, Error)]
-pub enum WriteError {
-    #[error("Attempt to write to read-only memory at {:x}", 0)]
-    ReadOnly(u16),
+pub enum WriteErrType {
+    #[error("Write to read-only memory")]
+    ReadOnly,
 }
 
 macro_rules! unimplemented_read {
@@ -42,7 +111,7 @@ macro_rules! unimplemented_read {
             "Attempted read at unimplemented region {:?}, returning 0x0",
             $region
         );
-        0
+        Ok(0)
     }};
 }
 
@@ -72,6 +141,24 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
         })
     }
 
+    #[inline]
+    fn r_err(&self, addr: u16, err: impl Into<ReadErrType>) -> ReadError {
+        ReadError {
+            addr,
+            region: self.map_to_region(addr),
+            err: err.into(),
+        }
+    }
+
+    #[inline]
+    fn w_err(&self, addr: u16, err: impl Into<WriteErrType>) -> WriteError {
+        WriteError {
+            addr,
+            region: self.map_to_region(addr),
+            err: err.into(),
+        }
+    }
+
     fn map_to_region(&self, addr: u16) -> MemRegion {
         match addr {
             0x0..=0xFE => {
@@ -90,24 +177,27 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
         }
     }
 
-    pub fn read8(&self, addr: u16) -> u8 {
+    pub fn read8(&self, addr: u16) -> Result<u8, ReadError> {
         match self.map_to_region(addr) {
-            MemRegion::BootRom => boot::IMAGE[addr as usize],
-            MemRegion::Cartridge => unimplemented_read!(MemRegion::Cartridge),
-            MemRegion::WorkRam => A::read(&self.ram, addr - 0xC000),
+            MemRegion::BootRom => Ok(boot::IMAGE[addr as usize]),
+            MemRegion::Cartridge => self.rom.read(addr).map_err(|e| self.r_err(addr, e)),
+            MemRegion::WorkRam => Ok(A::read(&self.ram, addr - 0xC000)),
             MemRegion::VRam => unimplemented_read!(MemRegion::VRam),
-            MemRegion::IORegs => self.io_read(addr),
+            MemRegion::IORegs => Ok(self.io_read(addr)),
             MemRegion::HighRam => unimplemented_read!(MemRegion::HighRam),
         }
     }
 
-    pub fn read16(&self, addr: u16) -> u16 {
-        u16::from_le_bytes([self.read8(addr), self.read8(addr + 1)])
+    pub fn read16(&self, addr: u16) -> Result<u16, ReadError> {
+        Ok(u16::from_le_bytes([
+            self.read8(addr)?,
+            self.read8(addr + 1)?,
+        ]))
     }
 
     pub fn write8(&mut self, addr: u16, value: u8) -> Result<(), WriteError> {
         match self.map_to_region(addr) {
-            MemRegion::BootRom => Err(WriteError::ReadOnly(addr)),
+            MemRegion::BootRom => Err(self.w_err(addr, WriteErrType::ReadOnly)),
             MemRegion::Cartridge => unimplemented_write!(MemRegion::Cartridge),
             MemRegion::WorkRam => {
                 A::write(&mut self.ram, addr - 0xC000, value);
@@ -158,11 +248,23 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum MemControllerDecoderErr {
+    #[error("Address out of 16 bit range: {0}")]
+    Addr(usize),
+
+    #[error("Read error: {0}")]
+    Read(#[from] ReadError),
+}
+
 impl<A: GBAllocator, R: RomReader> DecoderReadable for MemController<A, R> {
-    fn read_at(&self, idx: usize) -> Option<u8> {
-        match u16::try_from(idx) {
-            Ok(addr) => Some(self.read8(addr)),
-            Err(_) => None,
-        }
+    type Err = MemControllerDecoderErr;
+    fn read_at(&self, idx: usize) -> Result<u8, Self::Err> {
+        let result = match u16::try_from(idx) {
+            Ok(addr) => self.read8(addr)?,
+            Err(_) => return Err(MemControllerDecoderErr::Addr(idx)),
+        };
+
+        Ok(result)
     }
 }

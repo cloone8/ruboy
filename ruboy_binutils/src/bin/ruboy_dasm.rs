@@ -2,7 +2,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     fs::File,
-    io::{BufReader, Read, Seek},
+    io::{self, BufReader, Read, Seek},
 };
 
 use anyhow::{Context, Result};
@@ -32,18 +32,19 @@ impl<R: Read + Seek> SmartReader<R> {
 }
 
 impl<R: Read + Seek + ?Sized> DecoderReadable for SmartReader<R> {
-    fn read_at(&self, idx: usize) -> Option<u8> {
+    type Err = io::Error;
+    fn read_at(&self, idx: usize) -> Result<u8, Self::Err> {
         let mut reader = self.reader.borrow_mut();
         let cur_pos = self.pos.get();
         let offset = (idx - cur_pos) as isize;
 
-        reader.seek_relative(offset as i64).ok()?;
+        reader.seek_relative(offset as i64)?;
         let mut buf: [u8; 1] = [0; 1];
 
-        reader.read_exact(&mut buf).ok()?;
+        reader.read_exact(&mut buf)?;
         self.pos.replace(idx + 1);
 
-        Some(buf[0])
+        Ok(buf[0])
     }
 }
 
