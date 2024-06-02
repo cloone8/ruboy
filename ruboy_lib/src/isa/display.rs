@@ -77,13 +77,13 @@ impl TryFrom<&str> for DisplayableReg {
 }
 
 impl DisplayableReg {
-    const fn with_format(&self, fmt: FormatOpts) -> &'static str {
+    const fn with_format(&self, fmt: &FormatOpts) -> &'static str {
         match fmt.reg_case {
             Case::Upper => self.as_upper_str(fmt),
             Case::Lower => self.as_lower_str(fmt),
         }
     }
-    const fn as_lower_str(&self, fmt: FormatOpts) -> &'static str {
+    const fn as_lower_str(&self, fmt: &FormatOpts) -> &'static str {
         match self {
             DisplayableReg::A => "a",
             DisplayableReg::B => "b",
@@ -109,7 +109,7 @@ impl DisplayableReg {
         }
     }
 
-    const fn as_upper_str(&self, fmt: FormatOpts) -> &'static str {
+    const fn as_upper_str(&self, fmt: &FormatOpts) -> &'static str {
         match self {
             DisplayableReg::A => "A",
             DisplayableReg::B => "B",
@@ -154,7 +154,7 @@ macro_rules! format_immediate {
 }
 
 impl DisplayableImmediate {
-    fn with_format(&self, fmt: ImmediateFormat) -> String {
+    fn with_format(&self, fmt: &ImmediateFormat) -> String {
         match self {
             DisplayableImmediate::U8(x) => format_immediate!(fmt, x),
             DisplayableImmediate::I8(x) => {
@@ -210,15 +210,15 @@ struct DisplayableOperand {
 }
 
 impl DisplayableOperand {
-    fn with_format(&self, fmt: FormatOpts) -> String {
+    fn with_format(&self, fmt: &FormatOpts) -> String {
         let op_fmt = match self.operand {
             DisplayableOperandType::Reg(reg) => reg.with_format(fmt).to_owned(),
-            DisplayableOperandType::Imm(imm) => imm.with_format(fmt.imm_format),
+            DisplayableOperandType::Imm(imm) => imm.with_format(&fmt.imm_format),
             DisplayableOperandType::SpOffset(imm) => {
                 let sp = DisplayableReg::SP.with_format(fmt);
-                format!("{} + {}", sp, imm.with_format(fmt.imm_format))
+                format!("{} + {}", sp, imm.with_format(&fmt.imm_format))
             }
-            DisplayableOperandType::Extension(prefmt) => match fmt.opcode_case {
+            DisplayableOperandType::Extension(prefmt) => match fmt.mnemonic_case {
                 Case::Upper => prefmt.to_uppercase(),
                 Case::Lower => prefmt.to_lowercase(),
             },
@@ -229,7 +229,7 @@ impl DisplayableOperand {
             MemType::Normal => format!("[{}]", op_fmt),
             MemType::HighMem => format!(
                 "[{} + {}]",
-                DisplayableImmediate::U16(0xFF00).with_format(fmt.imm_format),
+                DisplayableImmediate::U16(0xFF00).with_format(&fmt.imm_format),
                 op_fmt
             ),
         }
@@ -267,16 +267,16 @@ pub enum Case {
     Lower,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ImmediateFormat {
     Decimal,
-    LowerHex { prefix: &'static str },
-    UpperHex { prefix: &'static str },
+    LowerHex { prefix: String },
+    UpperHex { prefix: String },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct FormatOpts {
-    pub opcode_case: Case,
+    pub mnemonic_case: Case,
     pub reg_case: Case,
     pub hlid_as_signs: bool,
     pub imm_format: ImmediateFormat,
@@ -286,10 +286,12 @@ pub struct FormatOpts {
 impl FormatOpts {
     pub fn rgdbs() -> Self {
         FormatOpts {
-            opcode_case: Case::Lower,
+            mnemonic_case: Case::Lower,
             reg_case: Case::Lower,
             hlid_as_signs: false,
-            imm_format: ImmediateFormat::UpperHex { prefix: "$" },
+            imm_format: ImmediateFormat::UpperHex {
+                prefix: "$".to_owned(),
+            },
             operand_order: OperandOrder::DstFirst,
         }
     }
@@ -303,46 +305,46 @@ impl Default for FormatOpts {
 
 #[derive(Debug, Clone)]
 pub struct DisplayableInstruction {
-    opcode: &'static str,
+    mnemonic: &'static str,
     operands: DisplayableOperands,
 }
 
 impl DisplayableInstruction {
-    const fn from_none(opcode: &'static str) -> Self {
+    const fn from_none(mnemonic: &'static str) -> Self {
         Self {
-            opcode,
+            mnemonic,
             operands: DisplayableOperands::None,
         }
     }
 
-    const fn from_single(opcode: &'static str, operand: DisplayableOperand) -> Self {
+    const fn from_single(mnemonic: &'static str, operand: DisplayableOperand) -> Self {
         Self {
-            opcode,
+            mnemonic,
             operands: DisplayableOperands::Single(operand),
         }
     }
 
     const fn from_dual(
-        opcode: &'static str,
+        mnemonic: &'static str,
         src: DisplayableOperand,
         dst: DisplayableOperand,
     ) -> Self {
         Self {
-            opcode,
+            mnemonic,
             operands: DisplayableOperands::Dual { src, dst },
         }
     }
 
-    pub fn with_format(&self, fmt: FormatOpts) -> String {
-        let fmt_opcode = match fmt.opcode_case {
-            Case::Upper => self.opcode.to_uppercase(),
-            Case::Lower => self.opcode.to_lowercase(),
+    pub fn with_format(&self, fmt: &FormatOpts) -> String {
+        let fmt_mnemonic = match fmt.mnemonic_case {
+            Case::Upper => self.mnemonic.to_uppercase(),
+            Case::Lower => self.mnemonic.to_lowercase(),
         };
 
         match self.operands {
-            DisplayableOperands::None => fmt_opcode,
+            DisplayableOperands::None => fmt_mnemonic,
             DisplayableOperands::Single(operand) => {
-                format!("{} {}", fmt_opcode, operand.with_format(fmt))
+                format!("{} {}", fmt_mnemonic, operand.with_format(&fmt))
             }
             DisplayableOperands::Dual { src, dst } => {
                 if matches!(fmt.operand_order, OperandOrder::DstFirst)
@@ -350,16 +352,16 @@ impl DisplayableInstruction {
                 {
                     format!(
                         "{} {}, {}",
-                        fmt_opcode,
-                        dst.with_format(fmt),
-                        src.with_format(fmt)
+                        fmt_mnemonic,
+                        dst.with_format(&fmt),
+                        src.with_format(&fmt)
                     )
                 } else {
                     format!(
                         "{} {}, {}",
-                        fmt_opcode,
-                        src.with_format(fmt),
-                        dst.with_format(fmt)
+                        fmt_mnemonic,
+                        src.with_format(&fmt),
+                        dst.with_format(&fmt)
                     )
                 }
             }
@@ -368,17 +370,17 @@ impl DisplayableInstruction {
 }
 
 macro_rules! to_display {
-    ($opcode:expr) => {
-        DisplayableInstruction::from_none($opcode)
+    ($mnemonic:expr) => {
+        DisplayableInstruction::from_none($mnemonic)
     };
 
-    ($opcode:expr, $operand:expr) => {
-        DisplayableInstruction::from_single($opcode, DisplayableOperand::from($operand))
+    ($mnemonic:expr, $operand:expr) => {
+        DisplayableInstruction::from_single($mnemonic, DisplayableOperand::from($operand))
     };
 
-    ($opcode:expr, $src:expr, $dst:expr) => {
+    ($mnemonic:expr, $src:expr, $dst:expr) => {
         DisplayableInstruction::from_dual(
-            $opcode,
+            $mnemonic,
             DisplayableOperand::from($src),
             DisplayableOperand::from($dst),
         )
@@ -531,53 +533,55 @@ impl From<RsVec> for DisplayableOperand {
 }
 
 macro_rules! to_display_bit {
-    ($bit:expr, $opcode:expr, $tgt:expr) => {
+    ($bit:expr, $mnemonic:expr, $tgt:expr) => {
         match $bit {
-            super::Bit::B0 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("0")),
-            super::Bit::B1 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("1")),
-            super::Bit::B2 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("2")),
-            super::Bit::B3 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("3")),
-            super::Bit::B4 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("4")),
-            super::Bit::B5 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("5")),
-            super::Bit::B6 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("6")),
-            super::Bit::B7 => to_display!($opcode, $tgt, DisplayableOperandType::Extension("7")),
+            super::Bit::B0 => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("0")),
+            super::Bit::B1 => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("1")),
+            super::Bit::B2 => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("2")),
+            super::Bit::B3 => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("3")),
+            super::Bit::B4 => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("4")),
+            super::Bit::B5 => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("5")),
+            super::Bit::B6 => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("6")),
+            super::Bit::B7 => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("7")),
         }
     };
 }
 
 macro_rules! to_display_cond {
-    ($cond:expr, $opcode:expr, $tgt:expr) => {
+    ($cond:expr, $mnemonic:expr, $tgt:expr) => {
         match $cond {
-            Condition::Zero => to_display!($opcode, $tgt, DisplayableOperandType::Extension("z")),
+            Condition::Zero => to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("z")),
             Condition::NotZero => {
-                to_display!($opcode, $tgt, DisplayableOperandType::Extension("nz"))
+                to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("nz"))
             }
-            Condition::Carry => to_display!($opcode, $tgt, DisplayableOperandType::Extension("c")),
+            Condition::Carry => {
+                to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("c"))
+            }
             Condition::NotCarry => {
-                to_display!($opcode, $tgt, DisplayableOperandType::Extension("nc"))
+                to_display!($mnemonic, $tgt, DisplayableOperandType::Extension("nc"))
             }
         }
     };
 
-    ($cond:expr, $opcode:expr) => {
+    ($cond:expr, $mnemonic:expr) => {
         match $cond {
-            Condition::Zero => to_display!($opcode, DisplayableOperandType::Extension("z")),
+            Condition::Zero => to_display!($mnemonic, DisplayableOperandType::Extension("z")),
             Condition::NotZero => {
-                to_display!($opcode, DisplayableOperandType::Extension("nz"))
+                to_display!($mnemonic, DisplayableOperandType::Extension("nz"))
             }
-            Condition::Carry => to_display!($opcode, DisplayableOperandType::Extension("c")),
+            Condition::Carry => to_display!($mnemonic, DisplayableOperandType::Extension("c")),
             Condition::NotCarry => {
-                to_display!($opcode, DisplayableOperandType::Extension("nc"))
+                to_display!($mnemonic, DisplayableOperandType::Extension("nc"))
             }
         }
     };
 }
 
 macro_rules! to_display_rot {
-    ($opcode:expr, $tgt:expr) => {
+    ($mnemonic:expr, $tgt:expr) => {
         match $tgt {
-            PrefArithTarget::Reg(Reg8::A) => to_display!(concat!($opcode, "a")),
-            _ => to_display!($opcode, $tgt),
+            PrefArithTarget::Reg(Reg8::A) => to_display!(concat!($mnemonic, "a")),
+            _ => to_display!($mnemonic, $tgt),
         }
     };
 }
@@ -644,7 +648,7 @@ impl From<Instruction> for DisplayableInstruction {
             Instruction::SetCarryFlag => to_display!("scf"),
             Instruction::ComplementCarry => to_display!("ccf"),
             Instruction::Rst(tgt) => to_display!("rst", tgt),
-            Instruction::IllegalInstruction(opcode) => to_display!("???", opcode),
+            Instruction::IllegalInstruction(mnemonic) => to_display!("???", mnemonic),
         }
     }
 }

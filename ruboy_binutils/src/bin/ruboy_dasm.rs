@@ -7,9 +7,13 @@ use std::{
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use ruboy_binutils::{cli::dasm, ListOutput};
+use ruboy_binutils::{
+    cli::dasm::{self, CLIArgs},
+    ListOutput,
+};
 use ruboy_lib::isa::{
     decoder::{decode, DecoderReadable},
+    display::{DisplayableInstruction, FormatOpts, ImmediateFormat},
     Instruction,
 };
 
@@ -36,7 +40,7 @@ impl<R: Read + Seek + ?Sized> DecoderReadable for SmartReader<R> {
     fn read_at(&self, idx: usize) -> Result<u8, Self::Err> {
         let mut reader = self.reader.borrow_mut();
         let cur_pos = self.pos.get();
-        let offset = (idx - cur_pos) as isize;
+        let offset = idx.wrapping_sub(cur_pos) as isize;
 
         reader.seek_relative(offset as i64)?;
         let mut buf: [u8; 1] = [0; 1];
@@ -48,10 +52,10 @@ impl<R: Read + Seek + ?Sized> DecoderReadable for SmartReader<R> {
     }
 }
 
-fn display_output(instructions: &HashMap<usize, Instruction>) {
-    let mut sorted: Vec<(usize, Instruction)> = instructions
+fn display_output(instructions: &HashMap<usize, String>) {
+    let mut sorted: Vec<(usize, _)> = instructions
         .iter()
-        .map(|(&addr, &instr)| (addr, instr))
+        .map(|(&addr, instr)| (addr, instr))
         .collect();
 
     sorted.sort_by(|x, y| usize::cmp(&x.0, &y.0));
@@ -65,10 +69,42 @@ fn display_output(instructions: &HashMap<usize, Instruction>) {
     println!("{}", output);
 }
 
+fn to_format_opts(args: &CLIArgs) -> FormatOpts {
+    let mut opts = FormatOpts::rgdbs();
+
+    if let Some(case) = args.mnemonic_case {
+        opts.mnemonic_case = case.into();
+    }
+
+    if let Some(case) = args.register_case {
+        opts.reg_case = case.into();
+    }
+
+    if let Some(hlid_signs) = args.hlid_signs {
+        opts.hlid_as_signs = hlid_signs;
+    }
+
+    if let Ok(imm_format) = ImmediateFormat::try_from(args.immediate_format.clone()) {
+        opts.imm_format = imm_format;
+    }
+
+    if let Some(op_order) = args.first_operand {
+        opts.operand_order = op_order.into();
+    }
+
+    opts
+}
+
+fn format_instruction(instr: Instruction, opts: &FormatOpts) -> String {
+    let displayable = DisplayableInstruction::from(instr);
+
+    displayable.with_format(opts)
+}
+
 fn main() -> Result<()> {
     let args = dasm::CLIArgs::parse();
-
-    let filepath = args.file;
+    let format_opts = to_format_opts(&args);
+    let filepath = args.file.clone();
     let file = File::open(filepath).context("Failed to open file")?;
 
     let reader = SmartReader::new(file);
@@ -89,7 +125,12 @@ fn main() -> Result<()> {
         }
     }
 
-    display_output(&instructions);
+    let instructions_formatted: HashMap<_, _> = instructions
+        .into_iter()
+        .map(|(addr, instr)| (addr, format_instruction(instr, &format_opts)))
+        .collect();
+
+    display_output(&instructions_formatted);
 
     Ok(())
 }

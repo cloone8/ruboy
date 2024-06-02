@@ -303,7 +303,7 @@ impl Display for Instruction {
         write!(
             f,
             "{}",
-            as_displayable.with_format(display::FormatOpts::rgdbs())
+            as_displayable.with_format(&display::FormatOpts::rgdbs())
         )
     }
 
