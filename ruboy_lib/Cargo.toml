@@ -27,3 +27,4 @@ cfg-if.workspace = true
 log.workspace = true
 thiserror.workspace = true
 ruboy_proc_macro.workspace = true
+spin_sleep.workspace = true
