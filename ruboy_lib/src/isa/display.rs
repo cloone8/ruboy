@@ -308,21 +308,25 @@ pub struct DisplayableInstruction {
 }
 
 impl DisplayableInstruction {
-    fn from_none(opcode: &'static str) -> Self {
+    const fn from_none(opcode: &'static str) -> Self {
         Self {
             opcode,
             operands: DisplayableOperands::None,
         }
     }
 
-    fn from_single(opcode: &'static str, operand: DisplayableOperand) -> Self {
+    const fn from_single(opcode: &'static str, operand: DisplayableOperand) -> Self {
         Self {
             opcode,
             operands: DisplayableOperands::Single(operand),
         }
     }
 
-    fn from_dual(opcode: &'static str, src: DisplayableOperand, dst: DisplayableOperand) -> Self {
+    const fn from_dual(
+        opcode: &'static str,
+        src: DisplayableOperand,
+        dst: DisplayableOperand,
+    ) -> Self {
         Self {
             opcode,
             operands: DisplayableOperands::Dual { src, dst },

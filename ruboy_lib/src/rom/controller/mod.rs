@@ -3,12 +3,10 @@ use std::marker::PhantomData;
 use nonbanking::NonBankingController;
 use thiserror::Error;
 
-use crate::allocator::GBAllocator;
+use crate::extern_traits::GBAllocator;
 
-use super::{
-    meta::{RomMeta, RomMetaParseError},
-    RomReader,
-};
+use super::meta::{RomMeta, RomMetaParseError};
+use crate::extern_traits::RomReader;
 
 mod nonbanking;
 

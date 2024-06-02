@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, ValueEnum};
 
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(author, about, version)]
 pub(crate) struct CLIArgs {
     pub rom: PathBuf,

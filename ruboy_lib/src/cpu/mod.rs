@@ -1,24 +1,25 @@
 mod registers;
 
-use decoder::DecoderReadable;
+use std::collections::VecDeque;
+
 use thiserror::Error;
 
 use registers::Registers;
 
 use crate::{
+    extern_traits::{GBAllocator, RomReader},
     isa::*,
     memcontroller::{MemController, MemControllerDecoderErr, ReadError, WriteError},
-    rom::RomReader,
-    GBAllocator,
 };
 
 pub struct Cpu {
     cycles_remaining: u8,
+    interrupts_master: bool,
     registers: Registers,
 }
 
 #[derive(Debug, Error)]
-pub enum InstructionExecutionError {
+pub enum CpuErr {
     #[error("Error during instruction decoding: {0}")]
     Decode(#[from] MemControllerDecoderErr),
 
@@ -42,6 +43,7 @@ impl Cpu {
     pub fn new() -> Self {
         Cpu {
             cycles_remaining: 0,
+            interrupts_master: false,
             registers: Registers::new(),
         }
     }
@@ -199,18 +201,16 @@ impl Cpu {
     pub fn run_cycle(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
-    ) -> Result<(), InstructionExecutionError> {
+    ) -> Result<(), CpuErr> {
         if self.cycles_remaining != 0 {
             // Still executing, continue later
             self.cycles_remaining -= 1;
             return Ok(());
         }
 
-        log::trace!("Decoding instruction at 0x{:x}", self.registers.pc());
-
         let instr = decoder::decode(mem, self.registers.pc())?;
 
-        log::debug!("Running 0x{:x}: {}", self.registers.pc(), instr);
+        log::trace!("Running 0x{:x}: {}", self.registers.pc(), instr);
 
         let jumped = match instr {
             Instruction::Nop => false,
@@ -408,7 +408,7 @@ impl Cpu {
             Instruction::ComplementCarry => instr_todo!(instr),
             Instruction::Rst(_) => instr_todo!(instr),
             Instruction::IllegalInstruction(illegal) => {
-                return Err(InstructionExecutionError::Illegal(illegal));
+                return Err(CpuErr::Illegal(illegal));
             }
         };
 
@@ -416,16 +416,7 @@ impl Cpu {
         if !jumped {
             let instr_len = instr.len() as u16;
 
-            log::trace!(
-                "Incrementing PC by {}, 0x{:x} -> 0x{:x}",
-                instr_len,
-                self.registers.pc(),
-                self.registers.pc() + instr_len
-            );
-
             self.registers.set_pc(self.registers.pc() + instr_len);
-        } else {
-            log::trace!("Skipping PC increment");
         }
 
         // Calculate remaining cycles

@@ -23,6 +23,7 @@ clap = { version = "4.5.4", features = ["derive"] }
 anyhow = "1.0.83"
 colored = "2.1.0"
 unicode-width = "0.1.11"
+eframe = "0.27.2"
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]

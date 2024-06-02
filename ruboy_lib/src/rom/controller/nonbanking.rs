@@ -1,6 +1,6 @@
 use crate::{
-    allocator::{GBAllocator, GBRam},
-    rom::{meta::RomMeta, RomReader},
+    extern_traits::{GBAllocator, GBRam, RomReader},
+    rom::meta::RomMeta,
 };
 
 use super::{Mbc, ReadError, WriteError};
@@ -8,8 +8,8 @@ use super::{Mbc, ReadError, WriteError};
 #[derive(Debug)]
 pub struct NonBankingController<A: GBAllocator> {
     meta: RomMeta,
-    rom_content: A::Mem<0x8000>,
-    ram_content: A::Mem<0x2000>,
+    rom_content: A::Mem<u8, 0x8000>,
+    ram_content: A::Mem<u8, 0x2000>,
 }
 
 impl<A: GBAllocator> NonBankingController<A> {
@@ -18,8 +18,8 @@ impl<A: GBAllocator> NonBankingController<A> {
 
         let mut new = Self {
             meta,
-            rom_content: A::allocate(),
-            ram_content: A::allocate(),
+            rom_content: A::empty(),
+            ram_content: A::empty(),
         };
 
         reader.read_into(new.rom_content.raw_mut(), 0)?;

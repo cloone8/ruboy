@@ -1,29 +1,34 @@
-use std::error::Error;
 use std::fmt::Display;
 use std::time::Duration;
 use std::time::Instant;
 
 use cpu::Cpu;
-use memcontroller::allocator::GBAllocator;
+use cpu::CpuErr;
 use memcontroller::MemController;
 
-pub use memcontroller::allocator;
 use memcontroller::MemControllerInitErr;
-use rom::RomReader;
+use ppu::Ppu;
+use ppu::PpuErr;
 use thiserror::Error;
 
 mod boot;
 mod cpu;
+mod extern_traits;
 pub mod isa;
 mod memcontroller;
+mod ppu;
 pub mod rom;
 
-pub struct Gameboy<A, R>
+pub use extern_traits::*;
+
+pub struct Gameboy<A, R, V>
 where
     A: GBAllocator,
     R: RomReader,
+    V: GBGraphicsDrawer,
 {
     cpu: Cpu,
+    ppu: Ppu<V>,
     mem: MemController<A, R>,
 }
 
@@ -79,15 +84,25 @@ pub enum GameboyStartErr<R: RomReader> {
     MemController(#[from] MemControllerInitErr<R>),
 }
 
-impl<A: GBAllocator, R: RomReader> Gameboy<A, R> {
-    pub fn new(rom: R) -> Result<Self, GameboyStartErr<R>> {
+#[derive(Debug, Error)]
+pub enum GameboyErr {
+    #[error("Error during CPU cycle: {0}")]
+    Cpu(#[from] CpuErr),
+
+    #[error("Error during PPU cycle: {0}")]
+    Ppu(#[from] PpuErr),
+}
+
+impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Gameboy<A, R, V> {
+    pub fn new(rom: R, output: V) -> Result<Self, GameboyStartErr<R>> {
         Ok(Self {
             cpu: Cpu::new(),
+            ppu: Ppu::new(output),
             mem: MemController::new(rom)?,
         })
     }
 
-    pub fn start(mut self) -> Result<(), Box<dyn Error>> {
+    pub fn start(mut self) -> Result<(), GameboyErr> {
         log::info!("Starting Ruboy Emulator");
 
         let mut cycles = 0_usize;
@@ -95,6 +110,8 @@ impl<A: GBAllocator, R: RomReader> Gameboy<A, R> {
 
         loop {
             self.cpu.run_cycle(&mut self.mem)?;
+            self.ppu.run_cycle(&mut self.mem)?;
+
             cycles += 1;
 
             let elapsed_time = last_second.elapsed();

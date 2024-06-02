@@ -18,3 +18,4 @@ log = { workspace = true, features = ["release_max_level_info"] }
 simplelog.workspace = true
 clap.workspace = true
 anyhow.workspace = true
+eframe.workspace = true
