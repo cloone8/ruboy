@@ -24,13 +24,19 @@ mod args;
 struct VideoOutput {
     frame_dirty: Arc<AtomicBool>,
     framebuf: Arc<Mutex<FrameData>>,
+    ui_ctx: egui::Context,
 }
 
 impl VideoOutput {
-    pub fn new(dirty_flag: Arc<AtomicBool>, framebuf: Arc<Mutex<FrameData>>) -> Self {
+    pub fn new(
+        dirty_flag: Arc<AtomicBool>,
+        framebuf: Arc<Mutex<FrameData>>,
+        ui_ctx: egui::Context,
+    ) -> Self {
         Self {
             frame_dirty: dirty_flag,
             framebuf,
+            ui_ctx,
         }
     }
 }
@@ -77,6 +83,9 @@ impl GBGraphicsDrawer for VideoOutput {
         }
 
         self.frame_dirty.store(true, Ordering::Relaxed);
+
+        self.ui_ctx.request_repaint();
+
         Ok(())
     }
 }
@@ -161,17 +170,27 @@ impl RuboyApp {
         }
     }
 
-    fn init_emuthread(&mut self) {
+    fn init_emuthread(&mut self, ctx: &egui::Context) {
+        debug_assert!(self.emu_thread.is_none());
+
         let thread_args = self.cli_args.clone();
         let cloned_framebuf = self.framebuf.clone();
         let cloned_dirty_flag = self.frame_dirty.clone();
+        let cloned_context = ctx.clone();
 
         self.emu_thread = Some(thread::spawn(move || {
-            emulator_thread(thread_args, cloned_framebuf, cloned_dirty_flag)
+            emulator_thread(
+                cloned_context,
+                thread_args,
+                cloned_framebuf,
+                cloned_dirty_flag,
+            )
         }));
     }
 
     fn init_gbtexture(&mut self, ctx: &egui::Context) {
+        debug_assert!(self.frametex.is_none());
+
         let framedata = self.framebuf.lock().unwrap();
 
         self.frametex = Some(ctx.load_texture(
@@ -183,7 +202,7 @@ impl RuboyApp {
 
     fn ensure_initialized(&mut self, ctx: &egui::Context) {
         if self.emu_thread.is_none() && !self.emu_died {
-            self.init_emuthread();
+            self.init_emuthread(ctx);
         }
 
         if self.frametex.is_none() {
@@ -253,14 +272,19 @@ impl eframe::App for RuboyApp {
     }
 }
 
-fn emulator_thread(args: CLIArgs, framebuf: Arc<Mutex<FrameData>>, dirty_flag: Arc<AtomicBool>) {
+fn emulator_thread(
+    ctx: egui::Context,
+    args: CLIArgs,
+    framebuf: Arc<Mutex<FrameData>>,
+    dirty_flag: Arc<AtomicBool>,
+) {
     let romfile = File::open(args.rom)
         .context("Could not open file at provided path")
         .unwrap();
 
     let reader = BufReader::new(romfile);
 
-    let video = VideoOutput::new(dirty_flag, framebuf);
+    let video = VideoOutput::new(dirty_flag, framebuf, ctx);
 
     let gameboy = Gameboy::<StackAllocator, _, _>::new(reader, video)
         .context("Could not initialize Gameboy")
