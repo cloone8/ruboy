@@ -187,14 +187,26 @@ pub enum Instruction {
     /// Rotate left
     RotLeftCarry(PrefArithTarget),
 
+    /// Rotate A left
+    RotLeftCarryA,
+
     /// Rotate right
     RotRightCarry(PrefArithTarget),
+
+    /// Rotate A right
+    RotRightCarryA,
 
     /// Rotate left through carry
     RotLeft(PrefArithTarget),
 
+    /// Rotate A left through carry
+    RotLeftA,
+
     /// Rotate right through carry
     RotRight(PrefArithTarget),
+
+    /// Rotate A right through carry
+    RotRightA,
 
     /// Shift left arithmetically
     ShiftLeftArith(PrefArithTarget),

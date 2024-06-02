@@ -486,6 +486,10 @@ impl Cpu {
             Instruction::SetCarryFlag => instr_todo!(instr),
             Instruction::ComplementCarry => instr_todo!(instr),
             Instruction::Rst(_) => instr_todo!(instr),
+            Instruction::RotLeftCarryA => todo!(),
+            Instruction::RotRightCarryA => todo!(),
+            Instruction::RotLeftA => todo!(),
+            Instruction::RotRightA => todo!(),
             Instruction::IllegalInstruction(illegal) => {
                 return Err(CpuErr::Illegal(illegal));
             }

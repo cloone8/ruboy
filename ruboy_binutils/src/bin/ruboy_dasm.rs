@@ -17,7 +17,7 @@ use ruboy_lib::isa::{
     Instruction,
 };
 
-// TODO: Pull into main lab and properly implement Read and Seek traits
+// TODO: Pull into main lib and properly implement Read and Seek traits
 struct SmartReader<R: Read + Seek + ?Sized> {
     pos: Cell<usize>,
     reader: RefCell<BufReader<R>>,

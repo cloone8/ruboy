@@ -87,7 +87,7 @@ macro_rules! cmp_reg {
     };
 }
 const fn decode_prefixed(instr: u8) -> Instruction {
-    let instr = match instr {
+    match instr {
         //TODO: Jesus Christ, proc macro time.
         0x00 => Instruction::RotLeftCarry(PrefArithTarget::Reg(Reg8::B)),
         0x01 => Instruction::RotLeftCarry(PrefArithTarget::Reg(Reg8::C)),
@@ -345,9 +345,7 @@ const fn decode_prefixed(instr: u8) -> Instruction {
         0xFD => Instruction::Set(Bit::B7, PrefArithTarget::Reg(Reg8::L)),
         0xFE => Instruction::Set(Bit::B7, PrefArithTarget::MemHL),
         0xFF => Instruction::Set(Bit::B7, PrefArithTarget::Reg(Reg8::A)),
-    };
-
-    instr
+    }
 }
 
 pub trait DecoderReadable {
@@ -385,7 +383,7 @@ pub fn decode<T: DecoderReadable>(mem: &T, pc: u16) -> Result<Instruction, T::Er
         0x04 => Instruction::Inc(IncDecTarget::Reg8(Reg8::B)),
         0x05 => Instruction::Dec(IncDecTarget::Reg8(Reg8::B)),
         0x06 => Instruction::Load8(Ld8Dst::Reg(Reg8::C), Ld8Src::Imm(read8(mem, pc + 1)?)),
-        0x07 => Instruction::RotLeftCarry(PrefArithTarget::Reg(Reg8::A)),
+        0x07 => Instruction::RotLeftCarryA,
         0x08 => Instruction::Load16(
             Ld16Dst::Mem(MemLoc::Imm(read16(mem, pc + 1)?)),
             Ld16Src::Reg(Reg16::SP),
@@ -396,7 +394,7 @@ pub fn decode<T: DecoderReadable>(mem: &T, pc: u16) -> Result<Instruction, T::Er
         0x0C => Instruction::Inc(IncDecTarget::Reg8(Reg8::C)),
         0x0D => Instruction::Dec(IncDecTarget::Reg8(Reg8::C)),
         0x0E => Instruction::Load8(Ld8Dst::Reg(Reg8::C), Ld8Src::Imm(read8(mem, pc + 1)?)),
-        0x0F => Instruction::RotRightCarry(PrefArithTarget::Reg(Reg8::A)),
+        0x0F => Instruction::RotRightCarryA,
 
         // 0x1_
         0x10 => Instruction::Stop(read8(mem, pc + 1)?),
@@ -406,7 +404,7 @@ pub fn decode<T: DecoderReadable>(mem: &T, pc: u16) -> Result<Instruction, T::Er
         0x14 => Instruction::Inc(IncDecTarget::Reg8(Reg8::D)),
         0x15 => Instruction::Dec(IncDecTarget::Reg8(Reg8::D)),
         0x16 => Instruction::Load8(Ld8Dst::Reg(Reg8::D), Ld8Src::Imm(read8(mem, pc + 1)?)),
-        0x17 => Instruction::RotLeft(PrefArithTarget::Reg(Reg8::A)),
+        0x17 => Instruction::RotLeftA,
         0x18 => Instruction::JumpRel(read8(mem, pc + 1)? as i8),
         0x19 => Instruction::AddHL(Reg16::DE),
         0x1A => Instruction::Load8(Ld8Dst::Reg(Reg8::A), Ld8Src::Mem(MemLoc::Reg(Reg16::DE))),
@@ -414,7 +412,7 @@ pub fn decode<T: DecoderReadable>(mem: &T, pc: u16) -> Result<Instruction, T::Er
         0x1C => Instruction::Inc(IncDecTarget::Reg8(Reg8::E)),
         0x1D => Instruction::Dec(IncDecTarget::Reg8(Reg8::E)),
         0x1E => Instruction::Load8(Ld8Dst::Reg(Reg8::E), Ld8Src::Imm(read8(mem, pc + 1)?)),
-        0x1F => Instruction::RotRight(PrefArithTarget::Reg(Reg8::A)),
+        0x1F => Instruction::RotRightA,
 
         // 0x2_
         0x20 => Instruction::JumpRelIf(read8(mem, pc + 1)? as i8, Condition::NotZero),

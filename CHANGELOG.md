@@ -2,6 +2,16 @@
 
 This file will document the most important changes for each released version.
 
+## [v0.1.3]
+
+### All
+- Fixed incorrect decoding of `RLA`, `RRA`, `RCLA` and `RRCA` instruction. They were being confused with their prefixed counterparts (`RLA` and `RL A`, for example). Not anymore!
+
+### ruboy_dasm
+
+- Adds command line options to tweak instruction output format
+- Fixes error in ROM file reader that could result in incorrect instruction decoding
+
 ## [v0.1.2]
 
 ### All

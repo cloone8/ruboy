@@ -577,15 +577,6 @@ macro_rules! to_display_cond {
     };
 }
 
-macro_rules! to_display_rot {
-    ($mnemonic:expr, $tgt:expr) => {
-        match $tgt {
-            PrefArithTarget::Reg(Reg8::A) => to_display!(concat!($mnemonic, "a")),
-            _ => to_display!($mnemonic, $tgt),
-        }
-    };
-}
-
 impl From<Instruction> for DisplayableInstruction {
     fn from(value: Instruction) -> Self {
         match value {
@@ -606,10 +597,10 @@ impl From<Instruction> for DisplayableInstruction {
             Instruction::Cmp(src) => to_display!("cmp", src, "a"),
             Instruction::Inc(tgt) => to_display!("inc", tgt),
             Instruction::Dec(tgt) => to_display!("dec", tgt),
-            Instruction::RotLeftCarry(tgt) => to_display_rot!("rlc", tgt),
-            Instruction::RotRightCarry(tgt) => to_display_rot!("rrc", tgt),
-            Instruction::RotLeft(tgt) => to_display_rot!("rl", tgt),
-            Instruction::RotRight(tgt) => to_display_rot!("rr", tgt),
+            Instruction::RotLeftCarry(tgt) => to_display!("rlc", tgt),
+            Instruction::RotRightCarry(tgt) => to_display!("rrc", tgt),
+            Instruction::RotLeft(tgt) => to_display!("rl", tgt),
+            Instruction::RotRight(tgt) => to_display!("rr", tgt),
             Instruction::ShiftLeftArith(tgt) => to_display!("sla", tgt),
             Instruction::ShiftRightArith(tgt) => to_display!("sra", tgt),
             Instruction::Swap(tgt) => to_display!("swap", tgt),
@@ -648,6 +639,10 @@ impl From<Instruction> for DisplayableInstruction {
             Instruction::SetCarryFlag => to_display!("scf"),
             Instruction::ComplementCarry => to_display!("ccf"),
             Instruction::Rst(tgt) => to_display!("rst", tgt),
+            Instruction::RotLeftCarryA => to_display!("rlca"),
+            Instruction::RotRightCarryA => to_display!("rrca"),
+            Instruction::RotLeftA => to_display!("rla"),
+            Instruction::RotRightA => to_display!("rra"),
             Instruction::IllegalInstruction(mnemonic) => to_display!("???", mnemonic),
         }
     }
