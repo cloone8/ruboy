@@ -1,13 +1,4 @@
-use super::{
-    ArithSrc, IncDecTarget, Instruction, Ld16Dst, Ld8Dst, Ld8Src, MemLoc, PrefArithTarget, Reg8,
-};
-
-const fn rot_len(tgt: PrefArithTarget) -> u8 {
-    match tgt {
-        PrefArithTarget::Reg(Reg8::A) => 1,
-        _ => 2,
-    }
-}
+use super::{ArithSrc, IncDecTarget, Instruction, Ld16Dst, Ld8Dst, Ld8Src, MemLoc};
 
 impl Instruction {
     /// Returns the length of this [`Instruction`] in bytes.
@@ -31,8 +22,8 @@ impl Instruction {
             Instruction::Cmp(src) => 1 + src.op_size(),
             Instruction::Inc(tgt) => 1 + tgt.op_size(),
             Instruction::Dec(tgt) => 1 + tgt.op_size(),
-            Instruction::RotLeftCarry(_) => 2,
-            Instruction::RotRightCarry(_) => 2,
+            Instruction::RotLeftCircular(_) => 2,
+            Instruction::RotRightCircular(_) => 2,
             Instruction::RotLeft(_) => 2,
             Instruction::RotRight(_) => 2,
             Instruction::ShiftLeftArith(_) => 2,
@@ -66,8 +57,8 @@ impl Instruction {
             Instruction::SetCarryFlag => 1,
             Instruction::ComplementCarry => 1,
             Instruction::Rst(_) => 1,
-            Instruction::RotLeftCarryA => 1,
-            Instruction::RotRightCarryA => 1,
+            Instruction::RotLeftCircularA => 1,
+            Instruction::RotRightCircularA => 1,
             Instruction::RotLeftA => 1,
             Instruction::RotRightA => 1,
             Instruction::IllegalInstruction(_) => panic!("Illegal instruction has no length"),

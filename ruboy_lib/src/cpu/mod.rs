@@ -342,8 +342,8 @@ impl Cpu {
                 };
                 false
             }
-            Instruction::RotLeftCarry(_) => instr_todo!(instr),
-            Instruction::RotRightCarry(_) => instr_todo!(instr),
+            Instruction::RotLeftCircular(_) => instr_todo!(instr),
+            Instruction::RotRightCircular(_) => instr_todo!(instr),
             Instruction::RotLeft(tgt) => {
                 let cur_val = self.get_prefarith_tgt(mem, tgt)?;
                 let (shifted, overflown) = cur_val.overflowing_shl(1);
@@ -486,8 +486,8 @@ impl Cpu {
             Instruction::SetCarryFlag => instr_todo!(instr),
             Instruction::ComplementCarry => instr_todo!(instr),
             Instruction::Rst(_) => instr_todo!(instr),
-            Instruction::RotLeftCarryA => todo!(),
-            Instruction::RotRightCarryA => todo!(),
+            Instruction::RotLeftCircularA => todo!(),
+            Instruction::RotRightCircularA => todo!(),
             Instruction::RotLeftA => todo!(),
             Instruction::RotRightA => todo!(),
             Instruction::IllegalInstruction(illegal) => {

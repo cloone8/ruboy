@@ -1,6 +1,5 @@
 use super::{
     ArithSrc, IncDecTarget, Instruction, Ld16Dst, Ld16Src, Ld8Dst, Ld8Src, MemLoc, PrefArithTarget,
-    Reg8,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -44,13 +43,6 @@ const fn pref_arith_long(tgt: PrefArithTarget) -> TCycles {
     }
 }
 
-const fn rot(tgt: PrefArithTarget) -> TCycles {
-    match tgt {
-        PrefArithTarget::Reg(Reg8::A) => cycles!(4),
-        _ => pref_arith_long(tgt),
-    }
-}
-
 impl Instruction {
     pub const fn cycles(self) -> TCycles {
         match self {
@@ -79,8 +71,8 @@ impl Instruction {
                 IncDecTarget::Reg16(_) => cycles!(8),
                 IncDecTarget::MemHL => cycles!(12),
             },
-            Instruction::RotLeftCarry(tgt) => pref_arith_long(tgt),
-            Instruction::RotRightCarry(tgt) => pref_arith_long(tgt),
+            Instruction::RotLeftCircular(tgt) => pref_arith_long(tgt),
+            Instruction::RotRightCircular(tgt) => pref_arith_long(tgt),
             Instruction::RotLeft(tgt) => pref_arith_long(tgt),
             Instruction::RotRight(tgt) => pref_arith_long(tgt),
             Instruction::ShiftLeftArith(tgt) => pref_arith_long(tgt),
@@ -140,8 +132,8 @@ impl Instruction {
             Instruction::SetCarryFlag => cycles!(4),
             Instruction::ComplementCarry => cycles!(4),
             Instruction::Rst(_) => cycles!(16),
-            Instruction::RotLeftCarryA => cycles!(4),
-            Instruction::RotRightCarryA => cycles!(4),
+            Instruction::RotLeftCircularA => cycles!(4),
+            Instruction::RotRightCircularA => cycles!(4),
             Instruction::RotLeftA => cycles!(4),
             Instruction::RotRightA => cycles!(4),
             Instruction::IllegalInstruction(_) => panic!("Illegal instruction has no cycle count"),

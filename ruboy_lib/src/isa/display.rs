@@ -4,6 +4,7 @@ use super::{
 };
 
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::upper_case_acronyms)]
 enum DisplayableReg {
     A,
     B,
@@ -344,7 +345,7 @@ impl DisplayableInstruction {
         match self.operands {
             DisplayableOperands::None => fmt_mnemonic,
             DisplayableOperands::Single(operand) => {
-                format!("{} {}", fmt_mnemonic, operand.with_format(&fmt))
+                format!("{} {}", fmt_mnemonic, operand.with_format(fmt))
             }
             DisplayableOperands::Dual { src, dst } => {
                 if matches!(fmt.operand_order, OperandOrder::DstFirst)
@@ -353,15 +354,15 @@ impl DisplayableInstruction {
                     format!(
                         "{} {}, {}",
                         fmt_mnemonic,
-                        dst.with_format(&fmt),
-                        src.with_format(&fmt)
+                        dst.with_format(fmt),
+                        src.with_format(fmt)
                     )
                 } else {
                     format!(
                         "{} {}, {}",
                         fmt_mnemonic,
-                        src.with_format(&fmt),
-                        dst.with_format(&fmt)
+                        src.with_format(fmt),
+                        dst.with_format(fmt)
                     )
                 }
             }
@@ -597,8 +598,8 @@ impl From<Instruction> for DisplayableInstruction {
             Instruction::Cmp(src) => to_display!("cmp", src, "a"),
             Instruction::Inc(tgt) => to_display!("inc", tgt),
             Instruction::Dec(tgt) => to_display!("dec", tgt),
-            Instruction::RotLeftCarry(tgt) => to_display!("rlc", tgt),
-            Instruction::RotRightCarry(tgt) => to_display!("rrc", tgt),
+            Instruction::RotLeftCircular(tgt) => to_display!("rlc", tgt),
+            Instruction::RotRightCircular(tgt) => to_display!("rrc", tgt),
             Instruction::RotLeft(tgt) => to_display!("rl", tgt),
             Instruction::RotRight(tgt) => to_display!("rr", tgt),
             Instruction::ShiftLeftArith(tgt) => to_display!("sla", tgt),
@@ -639,8 +640,8 @@ impl From<Instruction> for DisplayableInstruction {
             Instruction::SetCarryFlag => to_display!("scf"),
             Instruction::ComplementCarry => to_display!("ccf"),
             Instruction::Rst(tgt) => to_display!("rst", tgt),
-            Instruction::RotLeftCarryA => to_display!("rlca"),
-            Instruction::RotRightCarryA => to_display!("rrca"),
+            Instruction::RotLeftCircularA => to_display!("rlca"),
+            Instruction::RotRightCircularA => to_display!("rrca"),
             Instruction::RotLeftA => to_display!("rla"),
             Instruction::RotRightA => to_display!("rra"),
             Instruction::IllegalInstruction(mnemonic) => to_display!("???", mnemonic),

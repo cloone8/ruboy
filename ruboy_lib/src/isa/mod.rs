@@ -185,16 +185,16 @@ pub enum Instruction {
     Dec(IncDecTarget),
 
     /// Rotate left
-    RotLeftCarry(PrefArithTarget),
+    RotLeftCircular(PrefArithTarget),
 
     /// Rotate A left
-    RotLeftCarryA,
+    RotLeftCircularA,
 
     /// Rotate right
-    RotRightCarry(PrefArithTarget),
+    RotRightCircular(PrefArithTarget),
 
     /// Rotate A right
-    RotRightCarryA,
+    RotRightCircularA,
 
     /// Rotate left through carry
     RotLeft(PrefArithTarget),
