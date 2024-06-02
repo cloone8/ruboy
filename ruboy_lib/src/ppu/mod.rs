@@ -39,7 +39,7 @@ struct DrawData {}
 struct Tile([u8; 16]);
 
 #[derive(Debug, Clone, Copy)]
-struct BackgroundMap([u8; 32]);
+struct BackgroundMap([u8; 32 * 32]);
 
 #[derive(Debug, Clone, Copy, Default)]
 struct ObjectData([u8; 4]);

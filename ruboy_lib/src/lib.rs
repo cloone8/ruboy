@@ -21,7 +21,7 @@ pub mod rom;
 
 pub use extern_traits::*;
 
-const TARGET_CLOCK_SPEED_HZ: u64 = 4194304;
+const TARGET_CLOCK_SPEED_HZ: u64 = 1 << 22;
 const SPEED_CHECK_INTERVAL_MS: u64 = 10;
 const SPEED_CHECK_INTERVAL_DURATION: Duration = Duration::from_millis(SPEED_CHECK_INTERVAL_MS);
 const CYCLES_PER_INTERVAL: u64 = (TARGET_CLOCK_SPEED_HZ * SPEED_CHECK_INTERVAL_MS) / 1000;
