@@ -1,18 +1,20 @@
+use std::array;
 use std::fmt::Display;
 use std::io::BufReader;
 use std::ops::Deref;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::{error::Error, fs::File};
 
 use anyhow::{Context, Result};
 use clap::Parser;
-use eframe::egui::load::SizedTexture;
 use eframe::egui::{
-    self, CentralPanel, Color32, ColorImage, Image, TextureHandle, TextureOptions, TextureWrapMode,
+    self, load::SizedTexture, CentralPanel, Color32, ColorImage, Image, TextureHandle,
+    TextureOptions,
 };
 use eframe::NativeOptions;
-use ruboy_lib::{GBGraphicsDrawer, Gameboy, StackAllocator, FRAME_X, FRAME_Y};
+use ruboy_lib::{Frame, GBGraphicsDrawer, Gameboy, GbColorVal, StackAllocator, FRAME_X, FRAME_Y};
 use std::sync::Mutex;
 
 use crate::args::CLIArgs;
@@ -20,12 +22,16 @@ use crate::args::CLIArgs;
 mod args;
 
 struct VideoOutput {
+    frame_dirty: Arc<AtomicBool>,
     framebuf: Arc<Mutex<FrameData>>,
 }
 
 impl VideoOutput {
-    pub fn new(framebuf: Arc<Mutex<FrameData>>) -> Self {
-        Self { framebuf }
+    pub fn new(dirty_flag: Arc<AtomicBool>, framebuf: Arc<Mutex<FrameData>>) -> Self {
+        Self {
+            frame_dirty: dirty_flag,
+            framebuf,
+        }
     }
 }
 
@@ -52,14 +58,46 @@ const COLOR_3: Color32 = Color32::from_gray(0);
 impl GBGraphicsDrawer for VideoOutput {
     type Err = VideoOutputErr;
 
-    fn output(&mut self, frame: &ruboy_lib::Frame) -> std::prelude::v1::Result<(), Self::Err> {
-        todo!()
+    fn output(&mut self, frame: &Frame) -> std::result::Result<(), Self::Err> {
+        let converted_frame: Vec<Color32> = frame
+            .get_raw()
+            .iter()
+            .map(|color| match color {
+                GbColorVal::ID0 => COLOR_0,
+                GbColorVal::ID1 => COLOR_1,
+                GbColorVal::ID2 => COLOR_2,
+                GbColorVal::ID3 => COLOR_3,
+            })
+            .collect();
+
+        let mut locked_framebuf = self.framebuf.lock().unwrap();
+
+        for (i, pix) in locked_framebuf.buf.iter_mut().enumerate() {
+            *pix = converted_frame[i];
+        }
+
+        self.frame_dirty.store(true, Ordering::Relaxed);
+        Ok(())
     }
 }
 
 #[derive(Debug)]
 struct FrameData {
     buf: [Color32; FRAME_X * FRAME_Y],
+}
+
+impl TryFrom<&[Color32]> for FrameData {
+    type Error = ();
+
+    fn try_from(value: &[Color32]) -> std::prelude::v1::Result<Self, Self::Error> {
+        if value.len() != FRAME_X * FRAME_Y {
+            return Err(());
+        }
+
+        Ok(Self {
+            buf: array::from_fn(|i| value[i]),
+        })
+    }
 }
 
 impl From<&FrameData> for ColorImage {
@@ -98,27 +136,38 @@ struct RuboyApp {
     emu_thread: Option<JoinHandle<()>>,
     emu_died: bool,
     cli_args: CLIArgs,
+    frame_dirty: Arc<AtomicBool>,
     framebuf: Arc<Mutex<FrameData>>,
     frametex: Option<TextureHandle>,
 }
 
 impl RuboyApp {
-    pub fn new(args: CLIArgs, framebuf: Arc<Mutex<FrameData>>) -> Self {
+    pub fn new(args: CLIArgs) -> Self {
         Self {
             emu_thread: None,
             emu_died: false,
             cli_args: args,
-            framebuf,
+            framebuf: Arc::new(Mutex::new(FrameData::default())),
+            frame_dirty: Arc::new(AtomicBool::new(false)),
             frametex: None,
+        }
+    }
+
+    const fn get_gb_tex_options() -> TextureOptions {
+        TextureOptions {
+            magnification: egui::TextureFilter::Nearest,
+            minification: egui::TextureFilter::Nearest,
+            wrap_mode: egui::TextureWrapMode::ClampToEdge,
         }
     }
 
     fn init_emuthread(&mut self) {
         let thread_args = self.cli_args.clone();
         let cloned_framebuf = self.framebuf.clone();
+        let cloned_dirty_flag = self.frame_dirty.clone();
 
         self.emu_thread = Some(thread::spawn(move || {
-            emulator_thread(thread_args, cloned_framebuf)
+            emulator_thread(thread_args, cloned_framebuf, cloned_dirty_flag)
         }));
     }
 
@@ -128,11 +177,7 @@ impl RuboyApp {
         self.frametex = Some(ctx.load_texture(
             "Gameboy Display",
             ColorImage::from(framedata.deref()),
-            TextureOptions {
-                magnification: egui::TextureFilter::Nearest,
-                minification: egui::TextureFilter::Nearest,
-                wrap_mode: TextureWrapMode::default(),
-            },
+            Self::get_gb_tex_options(),
         ));
     }
 
@@ -144,6 +189,21 @@ impl RuboyApp {
         if self.frametex.is_none() {
             self.init_gbtexture(ctx);
         }
+    }
+
+    fn update_texture_from_framedata(&mut self) {
+        if !self.frame_dirty.load(Ordering::Relaxed) {
+            return;
+        }
+
+        let locked_framebuf = self.framebuf.lock().unwrap();
+
+        self.frametex.as_mut().unwrap().set(
+            ColorImage::from(locked_framebuf.deref()),
+            Self::get_gb_tex_options(),
+        );
+
+        self.frame_dirty.store(true, Ordering::Relaxed);
     }
 
     fn show_gameboy_frame(&mut self, ctx: &egui::Context) {
@@ -188,18 +248,19 @@ impl eframe::App for RuboyApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
+        self.update_texture_from_framedata();
         self.show_gameboy_frame(ctx);
     }
 }
 
-fn emulator_thread(args: CLIArgs, framebuf: Arc<Mutex<FrameData>>) {
+fn emulator_thread(args: CLIArgs, framebuf: Arc<Mutex<FrameData>>, dirty_flag: Arc<AtomicBool>) {
     let romfile = File::open(args.rom)
         .context("Could not open file at provided path")
         .unwrap();
 
     let reader = BufReader::new(romfile);
 
-    let video = VideoOutput::new(framebuf);
+    let video = VideoOutput::new(dirty_flag, framebuf);
 
     let gameboy = Gameboy::<StackAllocator, _, _>::new(reader, video)
         .context("Could not initialize Gameboy")
@@ -230,8 +291,6 @@ fn main() -> Result<()> {
 
     log::info!("Starting Ruboy Emulator Frontend");
 
-    let framebuf = Arc::new(Mutex::new(FrameData::default()));
-
     let options = NativeOptions {
         ..Default::default()
     };
@@ -239,7 +298,7 @@ fn main() -> Result<()> {
     eframe::run_native(
         "Ruboy",
         options,
-        Box::new(|_| Box::new(RuboyApp::new(args, framebuf))),
+        Box::new(|_| Box::new(RuboyApp::new(args))),
     )
     .expect("Could not initialize window");
 

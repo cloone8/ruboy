@@ -141,6 +141,37 @@ pub struct Frame {
     pixels: [GbColorVal; FRAME_X * FRAME_Y],
 }
 
+impl Frame {
+    pub fn get_raw(&self) -> &[GbColorVal] {
+        &self.pixels
+    }
+
+    pub fn get_raw_mut(&mut self) -> &mut [GbColorVal] {
+        &mut self.pixels
+    }
+
+    pub fn get_pix(&self, x: usize, y: usize) -> Option<GbColorVal> {
+        if x >= FRAME_X || y >= FRAME_Y {
+            return None;
+        }
+
+        Some(self.pixels[(y * FRAME_X) + x])
+    }
+
+    pub fn set_pix(&mut self, x: usize, y: usize, val: GbColorVal) {
+        if x >= FRAME_X || y >= FRAME_Y {
+            log::warn!(
+                "Attempt to set pixel outside of framebuffer at X={} Y={}",
+                x,
+                y
+            );
+            return;
+        }
+
+        self.pixels[(y * FRAME_X) + x] = val;
+    }
+}
+
 impl Default for Frame {
     fn default() -> Self {
         Self {
