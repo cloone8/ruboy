@@ -39,6 +39,21 @@ macro_rules! instr_todo {
     };
 }
 
+#[inline]
+const fn halfcarry8_sub(tgt: u8, src: u8) -> bool {
+    ((tgt & 0xf) - (src & 0xf)) & 0x10 == 0x10
+}
+
+#[inline]
+const fn halfcarry8_add(tgt: u8, src: u8) -> bool {
+    ((src & 0xf) + (tgt & 0xf)) > 0xf
+}
+
+#[inline]
+const fn halfcarry16_add(tgt: u16, src: u16) -> bool {
+    ((src & 0xfff) + (tgt & 0xfff)) > 0xfff
+}
+
 impl Cpu {
     pub fn new() -> Self {
         Cpu {
@@ -172,6 +187,18 @@ impl Cpu {
         Ok(())
     }
 
+    fn get_arith_src(
+        &self,
+        mem: &MemController<impl GBAllocator, impl RomReader>,
+        src: ArithSrc,
+    ) -> Result<u8, ReadError> {
+        match src {
+            ArithSrc::Reg(reg) => Ok(self.get_reg8_value(reg)),
+            ArithSrc::Imm(imm) => Ok(imm),
+            ArithSrc::Mem(memloc) => mem.read8(self.memloc_to_addr(memloc)),
+        }
+    }
+
     fn get_prefarith_tgt(
         &self,
         mem: &MemController<impl GBAllocator, impl RomReader>,
@@ -241,29 +268,78 @@ impl Cpu {
 
                 false
             }
-            Instruction::Cmp(_) => instr_todo!(instr),
+            Instruction::Cmp(src) => {
+                let base = self.registers.a();
+                let val = self.get_arith_src(mem, src)?;
+
+                let (res, carry) = base.overflowing_sub(val);
+                let zero = res == 0;
+
+                self.registers
+                    .set_flags(zero, true, halfcarry8_sub(base, val), carry);
+
+                false
+            }
             Instruction::Inc(tgt) => {
                 match tgt {
-                    IncDecTarget::Reg8(reg) => self.set_reg8_value(reg, self.get_reg8_value(reg)),
+                    IncDecTarget::Reg8(reg) => {
+                        let val = self.get_reg8_value(reg);
+                        let incremented = val.wrapping_add(1);
+
+                        self.registers.set_zero_flag(incremented == 0);
+                        self.registers.set_subtract_flag(false);
+                        self.registers.set_half_carry_flag(halfcarry8_add(val, 1));
+
+                        self.set_reg8_value(reg, incremented);
+                    }
                     IncDecTarget::Reg16(reg) => {
-                        self.set_reg16_value(reg, self.get_reg16_value(reg))
+                        let val = self.get_reg16_value(reg);
+                        let incremented = val.wrapping_add(1);
+
+                        self.set_reg16_value(reg, incremented);
                     }
                     IncDecTarget::MemHL => {
                         let addr = self.registers.hl();
-                        mem.write8(addr, mem.read8(addr)? + 1)?;
+                        let val = mem.read8(addr)?;
+                        let incremented = val.wrapping_add(1);
+
+                        self.registers.set_zero_flag(incremented == 0);
+                        self.registers.set_subtract_flag(false);
+                        self.registers.set_half_carry_flag(halfcarry8_add(val, 1));
+
+                        mem.write8(addr, incremented)?;
                     }
                 };
                 false
             }
             Instruction::Dec(tgt) => {
                 match tgt {
-                    IncDecTarget::Reg8(reg) => self.set_reg8_value(reg, self.get_reg8_value(reg)),
+                    IncDecTarget::Reg8(reg) => {
+                        let val = self.get_reg8_value(reg);
+                        let decremented = val.wrapping_sub(1);
+
+                        self.registers.set_zero_flag(decremented == 0);
+                        self.registers.set_subtract_flag(true);
+                        self.registers.set_half_carry_flag(halfcarry8_sub(val, 1));
+
+                        self.set_reg8_value(reg, decremented);
+                    }
                     IncDecTarget::Reg16(reg) => {
-                        self.set_reg16_value(reg, self.get_reg16_value(reg))
+                        let val = self.get_reg16_value(reg);
+                        let decremented = val.wrapping_sub(1);
+
+                        self.set_reg16_value(reg, decremented);
                     }
                     IncDecTarget::MemHL => {
                         let addr = self.registers.hl();
-                        mem.write8(addr, mem.read8(addr)? - 1)?;
+                        let val = mem.read8(addr)?;
+                        let decremented = val.wrapping_sub(1);
+
+                        self.registers.set_zero_flag(decremented == 0);
+                        self.registers.set_subtract_flag(true);
+                        self.registers.set_half_carry_flag(halfcarry8_sub(val, 1));
+
+                        mem.write8(addr, decremented)?;
                     }
                 };
                 false
@@ -271,12 +347,14 @@ impl Cpu {
             Instruction::RotLeftCarry(_) => instr_todo!(instr),
             Instruction::RotRightCarry(_) => instr_todo!(instr),
             Instruction::RotLeft(tgt) => {
-                let carry_set = self.registers.carry_flag();
                 let cur_val = self.get_prefarith_tgt(mem, tgt)?;
                 let (shifted, overflown) = cur_val.overflowing_shl(1);
+                let result = shifted | (self.registers.carry_flag() as u8);
 
-                self.registers.set_carry_flag(overflown);
-                self.set_prefarith_tgt(mem, tgt, shifted | (carry_set as u8))?;
+                self.registers
+                    .set_flags(result == 0, false, false, overflown);
+
+                self.set_prefarith_tgt(mem, tgt, result)?;
 
                 false
             }
@@ -294,6 +372,9 @@ impl Cpu {
                 let is_zero = val & (1 << (bit as usize)) == 0;
 
                 self.registers.set_zero_flag(is_zero);
+                self.registers.set_subtract_flag(false);
+                self.registers.set_half_carry_flag(true);
+
                 false
             }
             Instruction::Res(_, _) => instr_todo!(instr),
