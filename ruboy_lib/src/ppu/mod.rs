@@ -6,7 +6,7 @@ use crate::{
     extern_traits::{
         Frame, GBAllocator, GBGraphicsDrawer, GbColorVal, RomReader, FRAME_X, FRAME_Y,
     },
-    memcontroller::{MemController, ReadError},
+    memcontroller::{MemController, ReadError, OAM_START},
 };
 
 #[derive(Debug, Clone)]
@@ -97,7 +97,6 @@ impl From<ObjDataFlags> for u8 {
     }
 }
 
-const OAM_START: u16 = 0xFE00;
 const NUM_OAM_OBJECTS: u8 = 40;
 
 #[derive(Debug, Error)]
@@ -189,6 +188,8 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         }
 
         if data.num_in_buf < 10 {
+            log::trace!("OAM Scanning object {}", data.cur_obj_index);
+
             let obj_data_raw: [u8; 4] = mem.read_range(
                 OAM_START + (size_of::<ObjectData>() as u16 * data.cur_obj_index as u16),
             )?;
@@ -216,6 +217,8 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
                     log::trace!("Object buffer full, not adding any more");
                 }
             }
+        } else {
+            log::trace!("Cannot add more object to buffer in OAM scan, continuing");
         }
 
         data.cur_obj_index += 1;
@@ -251,10 +254,6 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
     ) -> Result<(), PpuErr> {
         self.sync_active_state(mem);
-
-        if !matches!(self.mode, PpuMode::Inactive) {
-            log::trace!("Running PPU cycle");
-        }
 
         match &mut self.mode {
             PpuMode::Inactive => {}

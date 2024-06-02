@@ -17,25 +17,30 @@ use crate::{
 pub mod interrupts;
 pub mod io;
 
-const WORKRAM_START: u16 = 0xC000;
-const WORKRAM_END: u16 = 0xE000;
-const WORKRAM_SIZE: u16 = WORKRAM_END - WORKRAM_START;
+pub const VRAM_START: u16 = 0x8000;
+pub const VRAM_END: u16 = 0xA000;
+pub const VRAM_SIZE: u16 = VRAM_END - VRAM_START;
 
-const VRAM_START: u16 = 0x8000;
-const VRAM_END: u16 = 0xA000;
-const VRAM_SIZE: u16 = VRAM_END - VRAM_START;
+pub const WORKRAM_START: u16 = 0xC000;
+pub const WORKRAM_END: u16 = 0xE000;
+pub const WORKRAM_SIZE: u16 = WORKRAM_END - WORKRAM_START;
 
-const HRAM_START: u16 = 0xFF80;
-const HRAM_END: u16 = 0xFFFF;
-const HRAM_SIZE: u16 = HRAM_END - HRAM_START;
+pub const OAM_START: u16 = 0xFE00;
+pub const OAM_END: u16 = 0xFEA0;
+pub const OAM_SIZE: u16 = OAM_END - OAM_START;
+
+pub const HRAM_START: u16 = 0xFF80;
+pub const HRAM_END: u16 = 0xFFFF;
+pub const HRAM_SIZE: u16 = HRAM_END - HRAM_START;
 
 pub struct MemController<A: GBAllocator, R: RomReader> {
-    ram: A::Mem<u8, { WORKRAM_SIZE as usize }>,
+    rom: RomController<A, R>,
     vram: A::Mem<u8, { VRAM_SIZE as usize }>,
+    ram: A::Mem<u8, { WORKRAM_SIZE as usize }>,
+    oam: A::Mem<u8, { OAM_SIZE as usize }>,
     hram: A::Mem<u8, { HRAM_SIZE as usize }>,
     interrupts_enabled: Interrupts,
     pub io_registers: IoRegs,
-    rom: RomController<A, R>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -161,10 +166,11 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
         log::debug!("Initializing memory controller");
 
         Ok(MemController {
-            ram: A::empty(),
-            vram: A::empty(),
-            hram: A::empty(),
             rom: RomController::new(rom)?,
+            vram: A::empty(),
+            ram: A::empty(),
+            oam: A::empty(),
+            hram: A::empty(),
             io_registers: IoRegs::new(),
             interrupts_enabled: Interrupts::default(),
         })
@@ -227,7 +233,7 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             MemRegion::VRam => Ok(self.vram.read(addr - VRAM_START)),
             MemRegion::WorkRam => Ok(self.ram.read(addr - WORKRAM_START)),
             MemRegion::EchoRam => unimplemented_read!(MemRegion::EchoRam),
-            MemRegion::ObjectAttrMem => unimplemented_read!(MemRegion::ObjectAttrMem),
+            MemRegion::ObjectAttrMem => Ok(self.oam.read(addr - OAM_START)),
             MemRegion::Prohibited => unimplemented_read!(MemRegion::Prohibited),
             MemRegion::IORegs => self
                 .io_registers
@@ -258,7 +264,10 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
                 Ok(())
             }
             MemRegion::EchoRam => unimplemented_write!(MemRegion::EchoRam),
-            MemRegion::ObjectAttrMem => unimplemented_write!(MemRegion::ObjectAttrMem),
+            MemRegion::ObjectAttrMem => {
+                self.oam.write(addr - OAM_START, value);
+                Ok(())
+            }
             MemRegion::Prohibited => unimplemented_write!(MemRegion::Prohibited),
             MemRegion::IORegs => self
                 .io_registers
