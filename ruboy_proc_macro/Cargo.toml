@@ -1,0 +1,18 @@
+[package]
+name = "ruboy_proc_macro"
+description = "The proc-macro support crate for Ruboy"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn.workspace = true
+quote.workspace = true

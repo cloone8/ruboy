@@ -178,14 +178,19 @@ impl RuboyApp {
         let cloned_dirty_flag = self.frame_dirty.clone();
         let cloned_context = ctx.clone();
 
-        self.emu_thread = Some(thread::spawn(move || {
-            emulator_thread(
-                cloned_context,
-                thread_args,
-                cloned_framebuf,
-                cloned_dirty_flag,
-            )
-        }));
+        let thread = thread::Builder::new()
+            .name("emulator".to_owned())
+            .spawn(move || {
+                emulator_thread(
+                    cloned_context,
+                    thread_args,
+                    cloned_framebuf,
+                    cloned_dirty_flag,
+                )
+            })
+            .expect("Could not spawn emulator thread");
+
+        self.emu_thread = Some(thread);
     }
 
     fn init_gbtexture(&mut self, ctx: &egui::Context) {
@@ -300,6 +305,7 @@ fn main() -> Result<()> {
     let args = CLIArgs::parse();
 
     let logconfig = simplelog::ConfigBuilder::new()
+        .set_thread_mode(simplelog::ThreadLogMode::Both)
         .set_time_format_rfc3339()
         .set_time_offset_to_local()
         .expect("Could not set logger time offset to local")

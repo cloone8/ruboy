@@ -1,5 +1,7 @@
 use std::{error::Error, fmt::Display};
 
+use interrupts::Interrupts;
+use io::{IoReadErr, IoRegs, IoWriteErr};
 use thiserror::Error;
 
 use crate::{
@@ -11,6 +13,9 @@ use crate::{
         controller::{RomController, RomControllerInitErr},
     },
 };
+
+pub mod interrupts;
+pub mod io;
 
 const WORKRAM_START: u16 = 0xC000;
 const WORKRAM_END: u16 = 0xE000;
@@ -24,96 +29,12 @@ const HRAM_START: u16 = 0xFF80;
 const HRAM_END: u16 = 0xFFFF;
 const HRAM_SIZE: u16 = HRAM_END - HRAM_START;
 
-#[derive(Debug, Clone, Copy, Default)]
-struct Interrupts {
-    raw: u8,
-}
-
-impl Interrupts {
-    #[inline]
-    const fn get(self, mask: u8) -> bool {
-        (self.raw & mask) != 0
-    }
-
-    #[inline]
-    fn set(&mut self, mask: u8, val: bool) {
-        if val {
-            self.raw |= mask
-        } else {
-            self.raw &= !mask
-        }
-    }
-
-    #[inline]
-    pub fn vblank(self) -> bool {
-        self.get(0b1)
-    }
-
-    #[inline]
-    pub fn lcd(self) -> bool {
-        self.get(0b01)
-    }
-
-    #[inline]
-    pub fn timer(self) -> bool {
-        self.get(0b001)
-    }
-
-    #[inline]
-    pub fn serial(self) -> bool {
-        self.get(0b0001)
-    }
-
-    #[inline]
-    pub fn joypad(self) -> bool {
-        self.get(0b00001)
-    }
-
-    #[inline]
-    pub fn set_vblank(&mut self, val: bool) {
-        self.set(0b1, val)
-    }
-
-    #[inline]
-    pub fn set_lcd(&mut self, val: bool) {
-        self.set(0b01, val)
-    }
-
-    #[inline]
-    pub fn set_timer(&mut self, val: bool) {
-        self.set(0b001, val)
-    }
-
-    #[inline]
-    pub fn set_serial(&mut self, val: bool) {
-        self.set(0b0001, val)
-    }
-
-    #[inline]
-    pub fn set_joypad(&mut self, val: bool) {
-        self.set(0b00001, val)
-    }
-}
-
-impl From<u8> for Interrupts {
-    fn from(value: u8) -> Self {
-        Interrupts { raw: value }
-    }
-}
-
-impl From<Interrupts> for u8 {
-    fn from(value: Interrupts) -> Self {
-        value.raw
-    }
-}
-
 pub struct MemController<A: GBAllocator, R: RomReader> {
-    boot_rom_enabled: bool,
     ram: A::Mem<u8, { WORKRAM_SIZE as usize }>,
     vram: A::Mem<u8, { VRAM_SIZE as usize }>,
     hram: A::Mem<u8, { HRAM_SIZE as usize }>,
     interrupts_enabled: Interrupts,
-    interrupts_requested: Interrupts,
+    pub io_registers: IoRegs,
     rom: RomController<A, R>,
 }
 
@@ -154,6 +75,9 @@ impl Display for MemRegion {
 pub enum ReadErrType {
     #[error("Error during ROM reading: {0}")]
     Rom(#[from] rom::controller::ReadError),
+
+    #[error("Error during I/O register reading: {0}")]
+    IORegs(#[from] IoReadErr),
 }
 
 #[derive(Debug)]
@@ -209,6 +133,9 @@ pub enum WriteErrType {
 
     #[error("Error during ROM writing: {0}")]
     Rom(#[from] rom::controller::WriteError),
+
+    #[error("Error during I/O register writing: {0}")]
+    IORegs(#[from] IoWriteErr),
 }
 
 macro_rules! unimplemented_read {
@@ -234,13 +161,12 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
         log::debug!("Initializing memory controller");
 
         Ok(MemController {
-            boot_rom_enabled: cfg!(feature = "boot_img_enabled"),
             ram: A::empty(),
             vram: A::empty(),
             hram: A::empty(),
-            interrupts_enabled: Interrupts::default(),
-            interrupts_requested: Interrupts::default(),
             rom: RomController::new(rom)?,
+            io_registers: IoRegs::new(),
+            interrupts_enabled: Interrupts::default(),
         })
     }
 
@@ -265,7 +191,7 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
     fn map_to_region(&self, addr: u16) -> MemRegion {
         match addr {
             0x0..=0xFE => {
-                if self.boot_rom_enabled {
+                if self.io_registers.boot_rom_enabled {
                     MemRegion::BootRom
                 } else {
                     MemRegion::Cartridge
@@ -284,6 +210,16 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
         }
     }
 
+    pub fn read_range<const N: usize>(&self, addr: u16) -> Result<[u8; N], ReadError> {
+        let mut buf = [0u8; N];
+
+        for i in 0u16..(N as u16) {
+            buf[i as usize] = self.read8(addr + i)?;
+        }
+
+        Ok(buf)
+    }
+
     pub fn read8(&self, addr: u16) -> Result<u8, ReadError> {
         match self.map_to_region(addr) {
             MemRegion::BootRom => Ok(boot::IMAGE[addr as usize]),
@@ -293,7 +229,10 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             MemRegion::EchoRam => unimplemented_read!(MemRegion::EchoRam),
             MemRegion::ObjectAttrMem => unimplemented_read!(MemRegion::ObjectAttrMem),
             MemRegion::Prohibited => unimplemented_read!(MemRegion::Prohibited),
-            MemRegion::IORegs => Ok(self.io_read(addr)),
+            MemRegion::IORegs => self
+                .io_registers
+                .read(addr)
+                .map_err(|e| self.r_err(addr, e)),
             MemRegion::HighRam => Ok(self.hram.read(addr - HRAM_START)),
             MemRegion::InterruptEnableReg => Ok(self.interrupts_enabled.into()),
         }
@@ -321,7 +260,10 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             MemRegion::EchoRam => unimplemented_write!(MemRegion::EchoRam),
             MemRegion::ObjectAttrMem => unimplemented_write!(MemRegion::ObjectAttrMem),
             MemRegion::Prohibited => unimplemented_write!(MemRegion::Prohibited),
-            MemRegion::IORegs => self.io_write(addr, value),
+            MemRegion::IORegs => self
+                .io_registers
+                .write(addr, value)
+                .map_err(|e| self.w_err(addr, e)),
             MemRegion::HighRam => {
                 self.hram.write(addr - HRAM_START, value);
                 Ok(())
@@ -338,40 +280,6 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
 
         self.write8(addr, bytes[0])?;
         self.write8(addr + 1, bytes[1])
-    }
-
-    fn io_write(&mut self, addr: u16, val: u8) -> Result<(), WriteError> {
-        match addr {
-            ..=0xFEFF => panic!("Too low for I/O range"),
-            0xFF50 => {
-                if self.boot_rom_enabled && val != 0 {
-                    log::debug!("Disabling boot ROM");
-                }
-
-                self.boot_rom_enabled = self.boot_rom_enabled && val == 0; // Disable boot-rom if non-zero is written
-
-                Ok(())
-            }
-            0xFF80.. => panic!("Too high for I/O range"),
-            _ => {
-                log::debug!("I/O register not implemented for writing: 0x{:x}", addr);
-                Ok(())
-            }
-        }
-    }
-
-    fn io_read(&self, addr: u16) -> u8 {
-        match addr {
-            ..=0xFEFF => panic!("Too low for I/O range"),
-            0xFF80.. => panic!("Too high for I/O range"),
-            _ => {
-                log::debug!(
-                    "I/O register not implemented for reading: 0x{:x}, returning 0xFF",
-                    addr
-                );
-                0xFF
-            }
-        }
     }
 }
 
