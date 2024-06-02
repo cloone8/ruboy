@@ -573,6 +573,15 @@ macro_rules! to_display_cond {
     };
 }
 
+macro_rules! to_display_rot {
+    ($opcode:expr, $tgt:expr) => {
+        match $tgt {
+            PrefArithTarget::Reg(Reg8::A) => to_display!(concat!($opcode, "a")),
+            _ => to_display!($opcode, $tgt),
+        }
+    };
+}
+
 impl From<Instruction> for DisplayableInstruction {
     fn from(value: Instruction) -> Self {
         match value {
@@ -593,10 +602,10 @@ impl From<Instruction> for DisplayableInstruction {
             Instruction::Cmp(src) => to_display!("cmp", src, "a"),
             Instruction::Inc(tgt) => to_display!("inc", tgt),
             Instruction::Dec(tgt) => to_display!("dec", tgt),
-            Instruction::RotLeftCarry(tgt) => to_display!("rlc", tgt),
-            Instruction::RotRightCarry(tgt) => to_display!("rrc", tgt),
-            Instruction::RotLeft(tgt) => to_display!("rl", tgt),
-            Instruction::RotRight(tgt) => to_display!("rr", tgt),
+            Instruction::RotLeftCarry(tgt) => to_display_rot!("rlc", tgt),
+            Instruction::RotRightCarry(tgt) => to_display_rot!("rrc", tgt),
+            Instruction::RotLeft(tgt) => to_display_rot!("rl", tgt),
+            Instruction::RotRight(tgt) => to_display_rot!("rr", tgt),
             Instruction::ShiftLeftArith(tgt) => to_display!("sla", tgt),
             Instruction::ShiftRightArith(tgt) => to_display!("sra", tgt),
             Instruction::Swap(tgt) => to_display!("swap", tgt),

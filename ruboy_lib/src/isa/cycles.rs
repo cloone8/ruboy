@@ -1,5 +1,6 @@
 use super::{
     ArithSrc, IncDecTarget, Instruction, Ld16Dst, Ld16Src, Ld8Dst, Ld8Src, MemLoc, PrefArithTarget,
+    Reg8,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -43,6 +44,13 @@ const fn pref_arith_long(tgt: PrefArithTarget) -> TCycles {
     }
 }
 
+const fn rot(tgt: PrefArithTarget) -> TCycles {
+    match tgt {
+        PrefArithTarget::Reg(Reg8::A) => cycles!(4),
+        _ => pref_arith_long(tgt),
+    }
+}
+
 impl Instruction {
     pub const fn cycles(self) -> TCycles {
         match self {
@@ -71,10 +79,10 @@ impl Instruction {
                 IncDecTarget::Reg16(_) => cycles!(8),
                 IncDecTarget::MemHL => cycles!(12),
             },
-            Instruction::RotLeftCarry(tgt) => pref_arith_long(tgt),
-            Instruction::RotRightCarry(tgt) => pref_arith_long(tgt),
-            Instruction::RotLeft(tgt) => pref_arith_long(tgt),
-            Instruction::RotRight(tgt) => pref_arith_long(tgt),
+            Instruction::RotLeftCarry(tgt) => rot(tgt),
+            Instruction::RotRightCarry(tgt) => rot(tgt),
+            Instruction::RotLeft(tgt) => rot(tgt),
+            Instruction::RotRight(tgt) => rot(tgt),
             Instruction::ShiftLeftArith(tgt) => pref_arith_long(tgt),
             Instruction::ShiftRightArith(tgt) => pref_arith_long(tgt),
             Instruction::Swap(tgt) => pref_arith_long(tgt),

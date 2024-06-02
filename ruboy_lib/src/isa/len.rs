@@ -1,4 +1,13 @@
-use super::{ArithSrc, IncDecTarget, Instruction, Ld16Dst, Ld8Dst, Ld8Src, MemLoc};
+use super::{
+    ArithSrc, IncDecTarget, Instruction, Ld16Dst, Ld8Dst, Ld8Src, MemLoc, PrefArithTarget, Reg8,
+};
+
+const fn rot_len(tgt: PrefArithTarget) -> u8 {
+    match tgt {
+        PrefArithTarget::Reg(Reg8::A) => 1,
+        _ => 2,
+    }
+}
 
 impl Instruction {
     /// Returns the length of this [`Instruction`] in bytes.
@@ -22,10 +31,10 @@ impl Instruction {
             Instruction::Cmp(src) => 1 + src.op_size(),
             Instruction::Inc(tgt) => 1 + tgt.op_size(),
             Instruction::Dec(tgt) => 1 + tgt.op_size(),
-            Instruction::RotLeftCarry(_) => 2,
-            Instruction::RotRightCarry(_) => 2,
-            Instruction::RotLeft(_) => 2,
-            Instruction::RotRight(_) => 2,
+            Instruction::RotLeftCarry(tgt) => rot_len(tgt),
+            Instruction::RotRightCarry(tgt) => rot_len(tgt),
+            Instruction::RotLeft(tgt) => rot_len(tgt),
+            Instruction::RotRight(tgt) => rot_len(tgt),
             Instruction::ShiftLeftArith(_) => 2,
             Instruction::ShiftRightArith(_) => 2,
             Instruction::Swap(_) => 2,

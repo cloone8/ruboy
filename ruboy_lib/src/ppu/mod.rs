@@ -252,7 +252,9 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
     ) -> Result<(), PpuErr> {
         self.sync_active_state(mem);
 
-        log::trace!("Running PPU cycle");
+        if !matches!(self.mode, PpuMode::Inactive) {
+            log::trace!("Running PPU cycle");
+        }
 
         match &mut self.mode {
             PpuMode::Inactive => {}
