@@ -1,7 +1,5 @@
 mod registers;
 
-use std::collections::VecDeque;
-
 use thiserror::Error;
 
 use registers::Registers;
@@ -41,17 +39,17 @@ macro_rules! instr_todo {
 
 #[inline]
 const fn halfcarry8_sub(tgt: u8, src: u8) -> bool {
-    ((tgt & 0xf) - (src & 0xf)) & 0x10 == 0x10
+    ((tgt & 0xf).wrapping_sub(src & 0xf)) & 0x10 == 0x10
 }
 
 #[inline]
 const fn halfcarry8_add(tgt: u8, src: u8) -> bool {
-    ((src & 0xf) + (tgt & 0xf)) > 0xf
+    ((src & 0xf).wrapping_add(tgt & 0xf)) > 0xf
 }
 
 #[inline]
 const fn halfcarry16_add(tgt: u16, src: u16) -> bool {
-    ((src & 0xfff) + (tgt & 0xfff)) > 0xfff
+    ((src & 0xfff).wrapping_add(tgt & 0xfff)) > 0xfff
 }
 
 impl Cpu {
