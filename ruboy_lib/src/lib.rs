@@ -23,8 +23,11 @@ pub use extern_traits::*;
 
 const TARGET_CLOCK_SPEED_HZ: u64 = 4194304;
 const SPEED_CHECK_INTERVAL_MS: u64 = 10;
+const SPEED_CHECK_INTERVAL_DURATION: Duration = Duration::from_millis(SPEED_CHECK_INTERVAL_MS);
 const CYCLES_PER_INTERVAL: u64 = (TARGET_CLOCK_SPEED_HZ * SPEED_CHECK_INTERVAL_MS) / 1000;
-const INTERVAL_DURATION: Duration = Duration::from_millis(SPEED_CHECK_INTERVAL_MS);
+
+const SPEED_REPORT_INTERVAL_MS: u64 = 1000;
+const SPEED_REPORT_INTERVAL_DURATION: Duration = Duration::from_millis(SPEED_REPORT_INTERVAL_MS);
 
 pub struct Gameboy<A, R, V>
 where
@@ -119,25 +122,40 @@ impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Gameboy<A, R, V> {
     pub fn start(mut self) -> Result<(), GameboyErr> {
         log::info!("Starting Ruboy Emulator");
 
-        let mut cycles = 0_usize;
+        let mut cycles_since_last_check = 0_usize;
+        let mut cycles_since_last_report = 0_usize;
+
         let mut last_speed_check = Instant::now();
+        let mut last_report = Instant::now();
 
         loop {
             self.cpu.run_cycle(&mut self.mem)?;
             self.ppu.run_cycle(&mut self.mem)?;
 
-            cycles += 1;
+            cycles_since_last_check += 1;
+            cycles_since_last_report += 1;
 
-            let elapsed_time = last_speed_check.elapsed();
-
-            if elapsed_time >= INTERVAL_DURATION {
-                let cycles_per_second = Frequency::new(cycles as f64 / elapsed_time.as_secs_f64());
+            // Report clock speed to the user
+            let last_report_elapsed = last_report.elapsed();
+            if last_report_elapsed >= SPEED_REPORT_INTERVAL_DURATION {
+                let cycles_per_second = Frequency::new(
+                    cycles_since_last_report as f64 / last_report_elapsed.as_secs_f64(),
+                );
 
                 log::info!("Current speed: {}", cycles_per_second);
-                cycles = 0;
+                cycles_since_last_report = 0;
+                last_report = Instant::now();
+            }
+
+            // Make sure we're keeping roughly in sync with the original gameboy
+            // clockspeed
+            let last_check_elapsed = last_speed_check.elapsed();
+
+            if last_check_elapsed >= SPEED_CHECK_INTERVAL_DURATION {
+                cycles_since_last_check = 0;
                 last_speed_check = Instant::now();
-            } else if cycles >= CYCLES_PER_INTERVAL as usize {
-                let wake_time = last_speed_check + INTERVAL_DURATION;
+            } else if cycles_since_last_check >= CYCLES_PER_INTERVAL as usize {
+                let wake_time = last_speed_check + SPEED_CHECK_INTERVAL_DURATION;
 
                 spin_sleep::sleep(wake_time.duration_since(Instant::now()));
             }

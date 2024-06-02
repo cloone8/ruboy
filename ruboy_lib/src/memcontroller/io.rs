@@ -136,6 +136,12 @@ pub struct IoRegs {
     /// 0xFF45
     pub lcd_y_comp: u8,
 
+    /// 0xFF4A
+    pub win_y: u8,
+
+    /// 0xFF4B
+    pub win_x: u8,
+
     /// 0xFF50
     pub boot_rom_enabled: bool,
 }
@@ -149,14 +155,16 @@ pub enum IoReadErr {}
 impl IoRegs {
     pub fn new() -> Self {
         Self {
-            boot_rom_enabled: cfg!(feature = "boot_img_enabled"),
+            interrupts_requested: Interrupts::default(),
+            lcd_control: LcdControl::default(),
             lcd_stat: 0,
-            scx: 0,
             scy: 0,
+            scx: 0,
             lcd_y: 0,
             lcd_y_comp: 0,
-            lcd_control: LcdControl::default(),
-            interrupts_requested: Interrupts::default(),
+            win_y: 0,
+            win_x: 0,
+            boot_rom_enabled: cfg!(feature = "boot_img_enabled"),
         }
     }
 
@@ -169,6 +177,8 @@ impl IoRegs {
             0xFF43 => self.scx = val,
             0xFF44 => self.lcd_y = val,
             0xFF45 => self.lcd_y_comp = val,
+            0xFF4A => self.win_y = val,
+            0xFF4B => self.win_x = val,
             0xFF50 => {
                 if self.boot_rom_enabled && val != 0 {
                     log::debug!("Disabling boot ROM");
@@ -194,6 +204,8 @@ impl IoRegs {
             0xFF43 => Ok(self.scx),
             0xFF44 => Ok(self.lcd_y),
             0xFF45 => Ok(self.lcd_y_comp),
+            0xFF4A => Ok(self.win_y),
+            0xFF4B => Ok(self.win_x),
             0xFF80.. => panic!("Too high for I/O range"),
             _ => {
                 log::debug!(
