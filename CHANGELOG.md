@@ -2,6 +2,14 @@
 
 This file will document the most important changes for each released version.
 
+## [v0.1.4]
+
+### All
+- Fixed incorrect calculation of the amount of banks in a ROM file
+
+### ruboy_romdump
+- Fixed incorrect output of lists (specifically, the hardware list of a ROM)
+
 ## [v0.1.3]
 
 ### All

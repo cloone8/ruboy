@@ -77,7 +77,7 @@ impl ListItem {
                 let mut result = String::new();
 
                 for value in values {
-                    result.push_str(format!("    - {}", value).as_str());
+                    result.push_str(format!("    - {}\n", value).as_str());
                 }
 
                 format!("{}\n{}", padded_label, result)

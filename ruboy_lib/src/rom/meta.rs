@@ -553,7 +553,10 @@ impl RomSize {
     }
 
     pub const fn num_banks(&self) -> usize {
-        2 << ((1 << self.raw) - 1)
+        const KB: usize = 1024;
+        const BANK_SIZE: usize = 32 * KB;
+
+        self.in_bytes() / BANK_SIZE
     }
 }
 
