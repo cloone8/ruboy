@@ -52,12 +52,12 @@ pub struct ParsableImmediateFormat {
 
     /// Print immediate values in lowercase hex format, with prefix.
     /// For example, prefix "0x" results in "0x5" or "0xb"
-    #[arg(short = 'x', long, value_name = "PREFIX", default_missing_value = "0x", num_args = 0.., require_equals = true)]
+    #[arg(short = 'x', long, value_name = "PREFIX", default_missing_value = "$", num_args = 0.., require_equals = true)]
     pub hex_lowercase: Option<String>,
 
     /// Print immediate values in lowercase hex format, with prefix.
     /// For example, prefix "0x" results in "0x5" or "0xB"
-    #[arg(short = 'X', long, value_name = "PREFIX", default_missing_value = "0x", num_args = 0.., require_equals = true)]
+    #[arg(short = 'X', long, value_name = "PREFIX", default_missing_value = "$", num_args = 0.., require_equals = true)]
     pub hex_uppercase: Option<String>,
 }
 
