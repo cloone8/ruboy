@@ -1,2 +1,3 @@
-# cpr_gameboy
-A easy-to-integrate gameboy emulation library written in rust
+# ruboy
+
+A Gameboy emulator with an easy-to-port library
