@@ -9,6 +9,7 @@ This file will document the most important changes for each released version.
 
 ### ruboy_romdump
 - Fixed incorrect output of lists (specifically, the hardware list of a ROM)
+- Added licensee name resolving
 
 ## [v0.1.3]
 

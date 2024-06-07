@@ -4,4 +4,5 @@ use std::{
 };
 
 pub(crate) mod controller;
+pub mod licensee;
 pub mod meta;

@@ -2,6 +2,8 @@ use std::{fmt::Display, io::Read, num::Wrapping};
 
 use thiserror::Error;
 
+use crate::rom::licensee;
+
 #[derive(Debug, Clone)]
 pub struct RomMeta {
     title: String,
@@ -268,8 +270,14 @@ pub enum Licensee {
 impl Display for Licensee {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Licensee::Old { raw } => write!(f, "0x{:x}", raw),
-            Licensee::New { raw } => write!(f, "0x{:x}", u16::from_be_bytes(*raw)),
+            Licensee::Old { raw } => match licensee::find_old(*raw) {
+                Some(licensee) => write!(f, "{}", licensee.names.join("/")),
+                None => write!(f, "0x{:x}", raw),
+            },
+            Licensee::New { raw } => match licensee::find_new(*raw) {
+                Some(licensee) => write!(f, "{}", licensee.names.join("/")),
+                None => write!(f, "0x{:x}", u16::from_be_bytes(*raw)),
+            },
         }
     }
 }
