@@ -613,7 +613,274 @@ pub const OLD_LICENSEES: &[OldLicensee] = &[
         names: &["LJN"],
     },
 ];
-pub const NEW_LICENSEES: &[NewLicensee] = &[];
+pub const NEW_LICENSEES: &[NewLicensee] = &[
+    NewLicensee {
+        code: [b'0', b'0'],
+        names: &["None"],
+    },
+    NewLicensee {
+        code: [b'0', b'1'],
+        names: &["Nintendo Research & Development 1"],
+    },
+    NewLicensee {
+        code: [b'0', b'8'],
+        names: &["Capcom"],
+    },
+    NewLicensee {
+        code: [b'1', b'3'],
+        names: &["EA (Electronic Arts)"],
+    },
+    NewLicensee {
+        code: [b'1', b'8'],
+        names: &["Hudson Soft"],
+    },
+    NewLicensee {
+        code: [b'1', b'9'],
+        names: &["B-AI"],
+    },
+    NewLicensee {
+        code: [b'2', b'0'],
+        names: &["KSS"],
+    },
+    NewLicensee {
+        code: [b'2', b'2'],
+        names: &["Planning Office WADA"],
+    },
+    NewLicensee {
+        code: [b'2', b'4'],
+        names: &["PCM Complete"],
+    },
+    NewLicensee {
+        code: [b'2', b'5'],
+        names: &["San-X"],
+    },
+    NewLicensee {
+        code: [b'2', b'8'],
+        names: &["Kemco"],
+    },
+    NewLicensee {
+        code: [b'2', b'9'],
+        names: &["SETA Corporation"],
+    },
+    NewLicensee {
+        code: [b'3', b'0'],
+        names: &["Viacom"],
+    },
+    NewLicensee {
+        code: [b'3', b'1'],
+        names: &["Nintendo"],
+    },
+    NewLicensee {
+        code: [b'3', b'2'],
+        names: &["Bandai"],
+    },
+    NewLicensee {
+        code: [b'3', b'3'],
+        names: &["Ocean Software", "Acclaim Entertainment"],
+    },
+    NewLicensee {
+        code: [b'3', b'4'],
+        names: &["Konami"],
+    },
+    NewLicensee {
+        code: [b'3', b'5'],
+        names: &["HectorSoft"],
+    },
+    NewLicensee {
+        code: [b'3', b'7'],
+        names: &["Taito"],
+    },
+    NewLicensee {
+        code: [b'3', b'8'],
+        names: &["Hudson Soft"],
+    },
+    NewLicensee {
+        code: [b'3', b'9'],
+        names: &["Banpresto"],
+    },
+    NewLicensee {
+        code: [b'4', b'1'],
+        names: &["Ubi Soft", "Ubisoft"],
+    },
+    NewLicensee {
+        code: [b'4', b'2'],
+        names: &["Atlus"],
+    },
+    NewLicensee {
+        code: [b'4', b'4'],
+        names: &["Malibu Interactive"],
+    },
+    NewLicensee {
+        code: [b'4', b'6'],
+        names: &["Angel"],
+    },
+    NewLicensee {
+        code: [b'4', b'7'],
+        names: &["Bullet-Proof Software", "Blue Planet Software"],
+    },
+    NewLicensee {
+        code: [b'4', b'9'],
+        names: &["Irem"],
+    },
+    NewLicensee {
+        code: [b'5', b'0'],
+        names: &["Absolute"],
+    },
+    NewLicensee {
+        code: [b'5', b'1'],
+        names: &["Acclaim Entertainment"],
+    },
+    NewLicensee {
+        code: [b'5', b'2'],
+        names: &["Activision"],
+    },
+    NewLicensee {
+        code: [b'5', b'3'],
+        names: &["Sammy USA Corporation"],
+    },
+    NewLicensee {
+        code: [b'5', b'4'],
+        names: &["Konami"],
+    },
+    NewLicensee {
+        code: [b'5', b'5'],
+        names: &["Hi Tech Expressions"],
+    },
+    NewLicensee {
+        code: [b'5', b'6'],
+        names: &["LJN"],
+    },
+    NewLicensee {
+        code: [b'5', b'7'],
+        names: &["Matchbox"],
+    },
+    NewLicensee {
+        code: [b'5', b'8'],
+        names: &["Mattel"],
+    },
+    NewLicensee {
+        code: [b'5', b'9'],
+        names: &["Milton Bradley Company"],
+    },
+    NewLicensee {
+        code: [b'6', b'0'],
+        names: &["Titus Interactive"],
+    },
+    NewLicensee {
+        code: [b'6', b'1'],
+        names: &[
+            "Virgin Games Ltd.",
+            "Virgin Mastertronic Ltd.",
+            "Virgin Interactive Entertainment",
+            "Avalon Interactive Group, Ltd.",
+        ],
+    },
+    NewLicensee {
+        code: [b'6', b'4'],
+        names: &["Lucasfilm Games", "LucasArts"],
+    },
+    NewLicensee {
+        code: [b'6', b'7'],
+        names: &["Ocean Software"],
+    },
+    NewLicensee {
+        code: [b'6', b'9'],
+        names: &["EA (Electronic Arts)"],
+    },
+    NewLicensee {
+        code: [b'7', b'0'],
+        names: &["Infogrames", "Atari SA"],
+    },
+    NewLicensee {
+        code: [b'7', b'1'],
+        names: &["Interplay Entertainment"],
+    },
+    NewLicensee {
+        code: [b'7', b'2'],
+        names: &["Broderbund"],
+    },
+    NewLicensee {
+        code: [b'7', b'3'],
+        names: &["Sculptured Software", "Iguana Entertainment"],
+    },
+    NewLicensee {
+        code: [b'7', b'5'],
+        names: &[
+            "The Sales Curve Limited",
+            "SCi",
+            "SCi Entertainment Group",
+            "Eidos",
+        ],
+    },
+    NewLicensee {
+        code: [b'7', b'8'],
+        names: &["THQ"],
+    },
+    NewLicensee {
+        code: [b'7', b'9'],
+        names: &["Accolade"],
+    },
+    NewLicensee {
+        code: [b'8', b'0'],
+        names: &["Misawa Entertainment"],
+    },
+    NewLicensee {
+        code: [b'8', b'3'],
+        names: &["lozc"],
+    },
+    NewLicensee {
+        code: [b'8', b'6'],
+        names: &["Tokuma Shoten"],
+    },
+    NewLicensee {
+        code: [b'8', b'7'],
+        names: &["Tsukuda Original"],
+    },
+    NewLicensee {
+        code: [b'9', b'1'],
+        names: &["Chunsoft Co.", "Spike Chunsoft Co., Ltd."],
+    },
+    NewLicensee {
+        code: [b'9', b'2'],
+        names: &["Video System"],
+    },
+    NewLicensee {
+        code: [b'9', b'3'],
+        names: &["Ocean Software", "Acclaim Entertainment"],
+    },
+    NewLicensee {
+        code: [b'9', b'5'],
+        names: &["Varie"],
+    },
+    NewLicensee {
+        code: [b'9', b'6'],
+        names: &["Yonezawa", "s'pal"],
+    },
+    NewLicensee {
+        code: [b'9', b'7'],
+        names: &["Kaneko"],
+    },
+    NewLicensee {
+        code: [b'9', b'9'],
+        names: &["Pack-In-Video"],
+    },
+    NewLicensee {
+        code: [b'9', b'H'],
+        names: &["Bottom Up"],
+    },
+    NewLicensee {
+        code: [b'A', b'4'],
+        names: &["Konami (Yu-Gi-Oh!)"],
+    },
+    NewLicensee {
+        code: [b'B', b'L'],
+        names: &["MTO"],
+    },
+    NewLicensee {
+        code: [b'D', b'K'],
+        names: &["Kodansha"],
+    },
+];
 
 pub fn find_old(code: u8) -> Option<OldLicensee> {
     OLD_LICENSEES.iter().find(|l| l.code == code).copied()
