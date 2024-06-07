@@ -14,7 +14,7 @@ use eframe::egui::{
     TextureOptions,
 };
 use eframe::NativeOptions;
-use ruboy_lib::{Frame, GBGraphicsDrawer, Gameboy, GbColorVal, StackAllocator, FRAME_X, FRAME_Y};
+use ruboy_lib::{Frame, GBGraphicsDrawer, GbColorVal, Ruboy, StackAllocator, FRAME_X, FRAME_Y};
 use std::sync::Mutex;
 
 use crate::args::CLIArgs;
@@ -199,7 +199,7 @@ impl RuboyApp {
         let framedata = self.framebuf.lock().unwrap();
 
         self.frametex = Some(ctx.load_texture(
-            "Gameboy Display",
+            "Ruboy Display",
             ColorImage::from(framedata.deref()),
             Self::get_gb_tex_options(),
         ));
@@ -291,13 +291,13 @@ fn emulator_thread(
 
     let video = VideoOutput::new(dirty_flag, framebuf, ctx);
 
-    let gameboy = Gameboy::<StackAllocator, _, _>::new(reader, video)
-        .context("Could not initialize Gameboy")
+    let ruboy = Ruboy::<StackAllocator, _, _>::new(reader, video)
+        .context("Could not initialize Ruboy")
         .unwrap();
 
-    gameboy
+    ruboy
         .start()
-        .context("Error during Gameboy execution")
+        .context("Error during Ruboy execution")
         .unwrap();
 }
 

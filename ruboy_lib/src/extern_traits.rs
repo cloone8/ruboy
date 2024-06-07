@@ -5,9 +5,28 @@ use std::{
     io::{Read, Seek},
 };
 
+/// Trait representing something that can read a ROM.
+/// Used internally by the Ruboy ROM memory-bank-controllers to read the data
+/// for each bank into memory dynamically.
 pub trait RomReader {
+    /// The error that can be returned by this reader.
     type Err: Error + 'static;
+
+    /// Given a buffer, this function should fill this buffer _completely_ with
+    /// data from the ROM on disk, starting at offset "addr"
+    ///
+    /// # Arguments
+    ///
+    /// * `buf` The buffer to fill
+    /// * `addr` The offset of the ROM on disk to start reading from
     fn read_into(&mut self, buf: &mut [u8], addr: usize) -> Result<(), Self::Err>;
+
+    /// Given a constant size N, this function should return a byte-array of size N filled with
+    /// bytes taken from the ROM on disk, starting at offset "addr"
+    ///
+    /// # Arguments
+    /// * `N` The amount of data to read, and the size of the returned array
+    /// * `addr` The offset of the ROM on disk to start reading from
     fn read<const N: usize>(&mut self, addr: usize) -> Result<[u8; N], Self::Err> {
         let mut buf = [0u8; N];
 
@@ -32,14 +51,35 @@ where
 
         match self.read_exact(buf) {
             Ok(_) => Ok(()),
-            Err(e) => Err(e.into()),
+            Err(e) => Err(e),
         }
     }
 }
 
+/// Trait representing something that can allocate memory for [crate::Ruboy]
+/// Usually not required to implement directly, but can be useful if a custom memory
+/// allocator is used.
+///
+/// See the two provided implementations: [StackAllocator] and [BoxAllocator]
 pub trait GBAllocator {
+    /// The type of the memory created by this allocator. For example [T; N] or Box<[T; N]>
     type Mem<T: Copy + Debug, const N: usize>: GBRam<T> + Debug;
+
+    /// Return an initialized buffer of size N, filled with clones of "orig"
+    ///
+    /// # Arguments
+    ///
+    /// * `T` The type of the buffer elements
+    /// * `N` The size of the buffer, in amount of elements
+    /// * `orig` The object to clone for initializing each element
     fn clone_from<T: Copy + Debug, const N: usize>(orig: &T) -> Self::Mem<T, N>;
+
+    /// Return a buffer of size N with each element initialized to its [Default]
+    ///
+    /// # Arguments
+    ///
+    /// * `T` The type of the buffer elements
+    /// * `N` The siz of the buffer, in amount of elements
     fn empty<T: Default + Copy + Debug, const N: usize>() -> Self::Mem<T, N>;
 }
 

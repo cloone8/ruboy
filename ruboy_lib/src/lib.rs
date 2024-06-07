@@ -29,7 +29,7 @@ const CYCLES_PER_INTERVAL: u64 = (TARGET_CLOCK_SPEED_HZ * SPEED_CHECK_INTERVAL_M
 const SPEED_REPORT_INTERVAL_MS: u64 = 1000;
 const SPEED_REPORT_INTERVAL_DURATION: Duration = Duration::from_millis(SPEED_REPORT_INTERVAL_MS);
 
-pub struct Gameboy<A, R, V>
+pub struct Ruboy<A, R, V>
 where
     A: GBAllocator,
     R: RomReader,
@@ -96,13 +96,13 @@ impl Display for Frequency {
 }
 
 #[derive(Debug, Error)]
-pub enum GameboyStartErr<R: RomReader> {
+pub enum RuboyStartErr<R: RomReader> {
     #[error("Could not initialize memory controller: {0}")]
     MemController(#[from] MemControllerInitErr<R>),
 }
 
 #[derive(Debug, Error)]
-pub enum GameboyErr {
+pub enum RuboyErr {
     #[error("Error during CPU cycle: {0}")]
     Cpu(#[from] CpuErr),
 
@@ -110,8 +110,8 @@ pub enum GameboyErr {
     Ppu(#[from] PpuErr),
 }
 
-impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Gameboy<A, R, V> {
-    pub fn new(rom: R, output: V) -> Result<Self, GameboyStartErr<R>> {
+impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Ruboy<A, R, V> {
+    pub fn new(rom: R, output: V) -> Result<Self, RuboyStartErr<R>> {
         Ok(Self {
             cpu: Cpu::new(),
             ppu: Ppu::new(output),
@@ -119,7 +119,7 @@ impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Gameboy<A, R, V> {
         })
     }
 
-    pub fn start(mut self) -> Result<(), GameboyErr> {
+    pub fn start(mut self) -> Result<(), RuboyErr> {
         log::info!("Starting Ruboy Emulator");
 
         let mut cycles_since_last_check = 0_usize;
