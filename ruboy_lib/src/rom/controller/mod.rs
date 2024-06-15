@@ -84,6 +84,6 @@ pub enum WriteError {
     #[error("RAM address {addr} out of reach for this cartridge (max {max})")]
     NotEnoughRam { addr: u16, max: u16 },
 
-    #[error("Address is read only: {0}")]
+    #[error("Address is read only: 0x{:x}", .0)]
     ReadOnly(u16),
 }

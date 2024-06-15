@@ -132,8 +132,8 @@ impl Display for WriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Error during memory read at 0x{:x} in region {}: {}",
-            self.addr, self.region, self.err
+            "Error during memory write at 0x{:x} in region {}",
+            self.addr, self.region
         )
     }
 }
@@ -143,10 +143,10 @@ pub enum WriteErrType {
     #[error("Write to read-only memory")]
     ReadOnly,
 
-    #[error("Error during ROM writing: {0}")]
+    #[error("Error during ROM writing")]
     Rom(#[from] rom::controller::WriteError),
 
-    #[error("Error during I/O register writing: {0}")]
+    #[error("Error during I/O register writing")]
     IORegs(#[from] IoWriteErr),
 }
 
@@ -282,7 +282,14 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
                 self.oam.write(addr - OAM_START, value);
                 Ok(())
             }
-            MemRegion::Prohibited => unimplemented_write!(MemRegion::Prohibited),
+            MemRegion::Prohibited => {
+                log::trace!(
+                    "Ignoring write of 0x{:x} to addr 0x{:x} in prohibited area",
+                    value,
+                    addr
+                );
+                Ok(())
+            }
             MemRegion::IORegs => self
                 .io_registers
                 .write(addr, value)

@@ -15,21 +15,24 @@ use crate::{
 pub struct Cpu {
     cycles_remaining: u8,
     interrupts_master: bool,
+    /// Whether the interrupts master flag should be re-enabled after the next instruction
+    ei_queued: bool,
+
     registers: Registers,
 }
 
 #[derive(Debug, Error)]
 pub enum CpuErr {
-    #[error("Error during instruction decoding: {0}")]
+    #[error("Error during instruction decoding")]
     Decode(#[from] MemControllerDecoderErr),
 
-    #[error("Illegal instruction: {0}")]
+    #[error("Illegal instruction: 0x{:x}", 0)]
     Illegal(u8),
 
-    #[error("Could not write to memory: {0}")]
+    #[error("Could not write to memory")]
     MemWriteError(#[from] WriteError),
 
-    #[error("Could not read to memory: {0}")]
+    #[error("Could not read from memory")]
     MemReadError(#[from] ReadError),
 }
 
@@ -44,6 +47,7 @@ impl Cpu {
         Cpu {
             cycles_remaining: 0,
             interrupts_master: false,
+            ei_queued: false,
             registers: Registers::new(),
         }
     }
@@ -224,12 +228,20 @@ impl Cpu {
 
         log::trace!("Running 0x{:x}: {}", self.registers.pc(), instr);
 
+        let enable_interrupts = self.ei_queued;
+
         let jumped = match instr {
             Instruction::Nop => false,
             Instruction::Stop(_) => instr_todo!(instr),
             Instruction::Halt => instr_todo!(instr),
-            Instruction::EI => instr_todo!(instr),
-            Instruction::DI => instr_todo!(instr),
+            Instruction::EI => {
+                self.ei_queued = true;
+                false
+            }
+            Instruction::DI => {
+                self.interrupts_master = false;
+                false
+            }
             Instruction::Add(src) => {
                 let base = self.registers.a();
                 let val = self.get_arith_src(mem, src)?;
@@ -260,8 +272,26 @@ impl Cpu {
                 false
             }
             Instruction::SubCarry(_) => instr_todo!(instr),
-            Instruction::And(_) => instr_todo!(instr),
-            Instruction::Or(_) => instr_todo!(instr),
+            Instruction::And(src) => {
+                let val = self.get_arith_src(mem, src)?;
+
+                let and = val & self.registers.a();
+
+                self.registers.set_flags(and == 0, false, true, false);
+                self.registers.set_a(and);
+
+                false
+            }
+            Instruction::Or(src) => {
+                let val = self.get_arith_src(mem, src)?;
+
+                let or = val | self.registers.a();
+
+                self.registers.set_flags(or == 0, false, false, false);
+                self.registers.set_a(or);
+
+                false
+            }
             Instruction::Xor(src) => {
                 let val = self.get_arith_src(mem, src)?;
 
@@ -349,7 +379,15 @@ impl Cpu {
                 false
             }
             Instruction::RotLeftCircular(_) => instr_todo!(instr),
-            Instruction::RotRightCircular(_) => instr_todo!(instr),
+            Instruction::RotRightCircular(tgt) => {
+                let pre = self.get_prefarith_tgt(mem, tgt)?;
+
+                self.registers.set_carry_flag(pre.lsb_set());
+
+                self.set_prefarith_tgt(mem, tgt, pre.rotate_right(1))?;
+
+                false
+            }
             Instruction::RotLeft(tgt) => {
                 let init_val = self.get_prefarith_tgt(mem, tgt)?;
                 let shifted = init_val.wrapping_shl(1);
@@ -365,7 +403,19 @@ impl Cpu {
             Instruction::RotRight(_) => instr_todo!(instr),
             Instruction::ShiftLeftArith(_) => instr_todo!(instr),
             Instruction::ShiftRightArith(_) => instr_todo!(instr),
-            Instruction::Swap(_) => instr_todo!(instr),
+            Instruction::Swap(tgt) => {
+                let val = self.get_prefarith_tgt(mem, tgt)?;
+                let val_lower = val & 0xF;
+                let val_upper = val & 0xF0;
+
+                let swapped = (val_lower << 4) | (val_upper >> 4);
+
+                self.set_prefarith_tgt(mem, tgt, swapped)?;
+
+                self.registers.set_flags(swapped == 0, false, false, false);
+
+                false
+            }
             Instruction::ShiftRightLogic(_) => instr_todo!(instr),
             Instruction::Bit(bit, tgt) => {
                 let val = match tgt {
@@ -430,10 +480,29 @@ impl Cpu {
 
                 false
             }
-            Instruction::LoadHLItoA => instr_todo!(instr),
-            Instruction::LoadHLDtoA => instr_todo!(instr),
+            Instruction::LoadHLItoA => {
+                let addr = self.registers.hl();
+                let val = mem.read8(addr)?;
+
+                self.registers.set_hl(addr + 1); // This increments HL
+                self.registers.set_a(val);
+
+                false
+            }
+            Instruction::LoadHLDtoA => {
+                let addr = self.registers.hl();
+                let val = mem.read8(addr)?;
+
+                self.registers.set_hl(addr - 1); // This decrements HL
+                self.registers.set_a(val);
+
+                false
+            }
             Instruction::LoadSPi8toHL(_) => instr_todo!(instr),
-            Instruction::Jump(_) => instr_todo!(instr),
+            Instruction::Jump(addr) => {
+                self.registers.set_pc(addr);
+                true
+            }
             Instruction::JumpRel(offset) => {
                 self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset);
                 true
@@ -488,12 +557,32 @@ impl Cpu {
                 false
             }
             Instruction::DecimalAdjust => instr_todo!(instr),
-            Instruction::ComplementAccumulator => instr_todo!(instr),
+            Instruction::ComplementAccumulator => {
+                self.registers.set_a(!self.registers.a());
+                self.registers.set_subtract_flag(true);
+                self.registers.set_half_carry_flag(true);
+                false
+            }
             Instruction::SetCarryFlag => instr_todo!(instr),
             Instruction::ComplementCarry => instr_todo!(instr),
-            Instruction::Rst(_) => instr_todo!(instr),
+            Instruction::Rst(rsvec) => {
+                let curr_addr = self.registers.pc();
+                let return_addr = curr_addr + (instr.len() as u16);
+
+                self.do_call(mem, return_addr, rsvec as u16)?;
+
+                true
+            }
             Instruction::RotLeftCircularA => instr_todo!(instr),
-            Instruction::RotRightCircularA => instr_todo!(instr),
+            Instruction::RotRightCircularA => {
+                let pre = self.registers.a();
+
+                self.registers.set_carry_flag(pre.lsb_set());
+
+                self.registers.set_a(pre.rotate_right(1));
+
+                false
+            }
             Instruction::RotLeftA => {
                 let cur_val = self.registers.a();
                 let shifted = cur_val.wrapping_shl(1);
@@ -511,6 +600,11 @@ impl Cpu {
                 return Err(CpuErr::Illegal(illegal));
             }
         };
+
+        if enable_interrupts {
+            self.ei_queued = false;
+            self.interrupts_master = true;
+        }
 
         // Set PC to next instruction, if we didn't jump
         if !jumped {

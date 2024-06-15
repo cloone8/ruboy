@@ -194,13 +194,17 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         let is_active = !matches!(self.mode, PpuMode::Inactive);
 
         if should_be_active && !is_active {
-            log::debug!("Turning PPU on, starting OAM scan");
+            log::info!("Turning PPU on");
 
             self.mode = PpuMode::OAMScan(OAMScanData::new())
         } else if !should_be_active && is_active {
-            log::debug!("Turning PPU off");
+            log::info!("Turning PPU off");
 
             self.mode = PpuMode::Inactive;
+            self.line_data = LineData::new();
+            self.frame_data = FrameData::new();
+            self.pix_fetcher = PixelFetcher::new();
+            mem.io_registers.lcd_y = 0;
         }
     }
 
@@ -337,8 +341,9 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
     ) -> Result<(), VBlankErr<V>> {
         if self.line_data.cur_cycle == CYCLES_PER_LINE {
             self.line_data = LineData::new();
+            mem.io_registers.lcd_y += 1;
 
-            if mem.io_registers.lcd_y as usize == FRAME_Y + 8 {
+            if mem.io_registers.lcd_y as usize == FRAME_Y + 9 {
                 mem.io_registers.lcd_y = 0;
 
                 self.output
@@ -351,8 +356,6 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
                 self.mode = PpuMode::OAMScan(OAMScanData::new());
 
                 self.pix_fetcher.vblank_reset();
-            } else {
-                mem.io_registers.lcd_y += 1;
             }
         }
 
@@ -376,6 +379,12 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             PpuMode::VBlank => self.vblank(mem)?,
             PpuMode::OAMScan(_) => self.oam_scan(mem)?,
             PpuMode::Draw(_) => self.draw(mem)?,
+        }
+
+        debug_assert!((mem.io_registers.lcd_y as usize) < FRAME_Y + 9);
+
+        if mem.io_registers.lcd_y as usize >= FRAME_Y {
+            debug_assert!(matches!(self.mode, PpuMode::VBlank));
         }
 
         Ok(())

@@ -104,10 +104,10 @@ pub enum RuboyStartErr<R: RomReader> {
 #[derive(Debug, Error)]
 // #[derive(Debug)]
 pub enum RuboyErr<V: GBGraphicsDrawer> {
-    #[error("Error during CPU cycle: {0}")]
+    #[error("Error during CPU cycle")]
     Cpu(#[from] CpuErr),
 
-    #[error("Error during PPU cycle: {0}")]
+    #[error("Error during PPU cycle")]
     Ppu(#[from] PpuErr<V>),
 }
 

@@ -241,7 +241,6 @@ impl Frame {
     }
 
     pub fn set_pix(&mut self, x: u8, y: u8, val: GbMonoColor) {
-        // log::info!("Setting pix {},{} to {:?}", x, y, val);
         if x as usize >= FRAME_X || y as usize >= FRAME_Y {
             log::warn!(
                 "Attempt to set pixel outside of framebuffer at X={} Y={}",

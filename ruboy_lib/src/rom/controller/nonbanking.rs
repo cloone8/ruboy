@@ -51,7 +51,7 @@ impl<A: GBAllocator> Mbc for NonBankingController<A> {
 
     fn write(&mut self, addr: u16, val: u8) -> Result<(), WriteError> {
         match addr {
-            0x0000..=0x7FFF => Err(WriteError::ReadOnly(addr)),
+            0x0000..=0x7FFF => Ok(()), // do nothing, read only
             0xA000..=0xBFFF => {
                 let ram_index = addr - 0xA000;
                 let ram_size = self.meta.ram_size().in_bytes();
