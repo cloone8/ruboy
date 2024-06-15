@@ -6,6 +6,8 @@ This file will document the most important changes for each released version.
 
 ### All
 - Added README's and some basic documentation. Gotta start somewhere!
+- Very basic PPU function. Renders background only. No window or objects
+- Fixed some math bugs with rot instructions, and fixed decoding of specific LD instruction
 
 ## [v0.1.4]
 
