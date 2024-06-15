@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Args, Parser, ValueEnum};
+use clap::{Parser, ValueEnum};
 
 #[derive(Parser, Debug, Clone)]
 #[command(author, about, version)]

@@ -29,6 +29,7 @@ eframe = "0.27.2"
 quote = "1.0.36"
 syn = "2.0.66"
 spin_sleep = "1.2.0"
+num = "0.4.3"
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]
@@ -39,7 +40,12 @@ ci = "github"
 # The installers to generate for each app
 installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+]
 # Publish jobs to run in CI
 pr-run-mode = "plan"
 

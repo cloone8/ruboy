@@ -1,5 +1,7 @@
+mod nums;
 mod registers;
 
+use nums::{GbBits, HalfCarry};
 use thiserror::Error;
 
 use registers::Registers;
@@ -35,21 +37,6 @@ macro_rules! instr_todo {
     ($instr:expr) => {
         todo!("{}", $instr)
     };
-}
-
-#[inline]
-const fn halfcarry8_sub(tgt: u8, src: u8) -> bool {
-    ((tgt & 0xf).wrapping_sub(src & 0xf)) & 0x10 == 0x10
-}
-
-#[inline]
-const fn halfcarry8_add(tgt: u8, src: u8) -> bool {
-    ((src & 0xf).wrapping_add(tgt & 0xf)) > 0xf
-}
-
-#[inline]
-const fn halfcarry16_add(tgt: u16, src: u16) -> bool {
-    ((src & 0xfff).wrapping_add(tgt & 0xfff)) > 0xfff
 }
 
 impl Cpu {
@@ -248,10 +235,9 @@ impl Cpu {
                 let val = self.get_arith_src(mem, src)?;
 
                 let (res, carry) = base.overflowing_add(val);
-                let zero = res == 0;
 
                 self.registers
-                    .set_flags(zero, false, halfcarry8_add(base, val), carry);
+                    .set_flags(res == 0, false, base.halfcarry_add(val), carry);
 
                 self.registers.set_a(res);
 
@@ -265,10 +251,9 @@ impl Cpu {
                 let val = self.get_arith_src(mem, src)?;
 
                 let (res, carry) = base.overflowing_sub(val);
-                let zero = res == 0;
 
                 self.registers
-                    .set_flags(zero, true, halfcarry8_sub(base, val), carry);
+                    .set_flags(res == 0, true, base.halfcarry_sub(val), carry);
 
                 self.registers.set_a(res);
 
@@ -293,10 +278,9 @@ impl Cpu {
                 let val = self.get_arith_src(mem, src)?;
 
                 let (res, carry) = base.overflowing_sub(val);
-                let zero = res == 0;
 
                 self.registers
-                    .set_flags(zero, true, halfcarry8_sub(base, val), carry);
+                    .set_flags(res == 0, true, base.halfcarry_sub(val), carry);
 
                 false
             }
@@ -308,7 +292,7 @@ impl Cpu {
 
                         self.registers.set_zero_flag(incremented == 0);
                         self.registers.set_subtract_flag(false);
-                        self.registers.set_half_carry_flag(halfcarry8_add(val, 1));
+                        self.registers.set_half_carry_flag(val.halfcarry_add(1));
 
                         self.set_reg8_value(reg, incremented);
                     }
@@ -325,7 +309,7 @@ impl Cpu {
 
                         self.registers.set_zero_flag(incremented == 0);
                         self.registers.set_subtract_flag(false);
-                        self.registers.set_half_carry_flag(halfcarry8_add(val, 1));
+                        self.registers.set_half_carry_flag(val.halfcarry_add(1));
 
                         mem.write8(addr, incremented)?;
                     }
@@ -340,7 +324,7 @@ impl Cpu {
 
                         self.registers.set_zero_flag(decremented == 0);
                         self.registers.set_subtract_flag(true);
-                        self.registers.set_half_carry_flag(halfcarry8_sub(val, 1));
+                        self.registers.set_half_carry_flag(val.halfcarry_sub(1));
 
                         self.set_reg8_value(reg, decremented);
                     }
@@ -357,7 +341,7 @@ impl Cpu {
 
                         self.registers.set_zero_flag(decremented == 0);
                         self.registers.set_subtract_flag(true);
-                        self.registers.set_half_carry_flag(halfcarry8_sub(val, 1));
+                        self.registers.set_half_carry_flag(val.halfcarry_sub(1));
 
                         mem.write8(addr, decremented)?;
                     }
@@ -367,12 +351,12 @@ impl Cpu {
             Instruction::RotLeftCircular(_) => instr_todo!(instr),
             Instruction::RotRightCircular(_) => instr_todo!(instr),
             Instruction::RotLeft(tgt) => {
-                let cur_val = self.get_prefarith_tgt(mem, tgt)?;
-                let (shifted, overflown) = cur_val.overflowing_shl(1);
-                let result = shifted | (self.registers.carry_flag() as u8);
+                let init_val = self.get_prefarith_tgt(mem, tgt)?;
+                let shifted = init_val.wrapping_shl(1);
+                let result = shifted.set_lsb(self.registers.carry_flag());
 
                 self.registers
-                    .set_flags(result == 0, false, false, overflown);
+                    .set_flags(result == 0, false, false, init_val.msb_set());
 
                 self.set_prefarith_tgt(mem, tgt, result)?;
 
@@ -512,11 +496,11 @@ impl Cpu {
             Instruction::RotRightCircularA => instr_todo!(instr),
             Instruction::RotLeftA => {
                 let cur_val = self.registers.a();
-                let (shifted, overflown) = cur_val.overflowing_shl(1);
-                let result = shifted | (self.registers.carry_flag() as u8);
+                let shifted = cur_val.wrapping_shl(1);
+                let result = shifted.set_lsb(self.registers.carry_flag());
 
                 self.registers
-                    .set_flags(result == 0, false, false, overflown);
+                    .set_flags(false, false, false, cur_val.msb_set());
 
                 self.registers.set_a(result);
 

@@ -57,10 +57,10 @@ impl Error for VideoOutputErr {
     }
 }
 
-const WHITE: Color32 = Color32::from_rgb(155, 188, 15);
-const LIGHT_GRAY: Color32 = Color32::from_rgb(139, 172, 15);
-const DARK_GRAY: Color32 = Color32::from_rgb(48, 98, 14);
-const BLACK: Color32 = Color32::from_rgb(15, 56, 15);
+const WHITE: Color32 = Color32::from_rgb(123, 130, 15);
+const LIGHT_GRAY: Color32 = Color32::from_rgb(90, 121, 66);
+const DARK_GRAY: Color32 = Color32::from_rgb(57, 89, 74);
+const BLACK: Color32 = Color32::from_rgb(41, 65, 57);
 
 impl GBGraphicsDrawer for VideoOutput {
     type Err = VideoOutputErr;
@@ -264,7 +264,7 @@ impl RuboyApp {
 }
 
 impl eframe::App for RuboyApp {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ensure_initialized(ctx);
 
         if !self.ensure_emulator_alive() {

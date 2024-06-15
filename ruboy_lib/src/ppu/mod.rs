@@ -228,7 +228,11 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         if data.cur_obj_index >= NUM_OAM_OBJECTS {
             // Operation complete. If no more objects need to be scanned, go to next
             // phase
-            log::debug!("OAM scan done, entering Draw mode");
+            log::debug!(
+                "OAM scan done, entering Draw mode. Found {} objects",
+                data.num_in_buf
+            );
+
             mem.vram_open = false;
             self.mode = PpuMode::Draw(DrawData::new(data.buffer, data.num_in_buf));
             return Ok(());
