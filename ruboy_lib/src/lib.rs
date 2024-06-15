@@ -102,13 +102,17 @@ pub enum RuboyStartErr<R: RomReader> {
 }
 
 #[derive(Debug, Error)]
-pub enum RuboyErr {
+// #[derive(Debug)]
+pub enum RuboyErr<V: GBGraphicsDrawer> {
     #[error("Error during CPU cycle: {0}")]
     Cpu(#[from] CpuErr),
 
     #[error("Error during PPU cycle: {0}")]
-    Ppu(#[from] PpuErr),
+    Ppu(#[from] PpuErr<V>),
 }
+
+// impl<V: GBGraphicsDrawer> std::error::Error for RuboyErr<V> {}
+// impl<V: GBGraphicsDrawer> Display for RuboyErr<V> {}
 
 impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Ruboy<A, R, V> {
     pub fn new(rom: R, output: V) -> Result<Self, RuboyStartErr<R>> {
@@ -119,7 +123,7 @@ impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Ruboy<A, R, V> {
         })
     }
 
-    pub fn start(mut self) -> Result<(), RuboyErr> {
+    pub fn start(mut self) -> Result<(), RuboyErr<V>> {
         log::info!("Starting Ruboy Emulator");
 
         let mut cycles_since_last_check = 0_usize;

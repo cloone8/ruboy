@@ -14,13 +14,14 @@ use eframe::egui::{
     TextureOptions,
 };
 use eframe::NativeOptions;
-use ruboy_lib::{Frame, GBGraphicsDrawer, GbColorVal, Ruboy, StackAllocator, FRAME_X, FRAME_Y};
+use ruboy_lib::{Frame, GBGraphicsDrawer, GbMonoColor, InlineAllocator, Ruboy, FRAME_X, FRAME_Y};
 use std::sync::Mutex;
 
 use crate::args::CLIArgs;
 
 mod args;
 
+#[derive(Debug)]
 struct VideoOutput {
     frame_dirty: Arc<AtomicBool>,
     framebuf: Arc<Mutex<FrameData>>,
@@ -56,10 +57,10 @@ impl Error for VideoOutputErr {
     }
 }
 
-const COLOR_0: Color32 = Color32::from_gray(255);
-const COLOR_1: Color32 = Color32::from_gray(170);
-const COLOR_2: Color32 = Color32::from_gray(85);
-const COLOR_3: Color32 = Color32::from_gray(0);
+const WHITE: Color32 = Color32::from_gray(255);
+const LIGHT_GRAY: Color32 = Color32::from_gray(170);
+const DARK_GRAY: Color32 = Color32::from_gray(85);
+const BLACK: Color32 = Color32::from_gray(0);
 
 impl GBGraphicsDrawer for VideoOutput {
     type Err = VideoOutputErr;
@@ -69,10 +70,10 @@ impl GBGraphicsDrawer for VideoOutput {
             .get_raw()
             .iter()
             .map(|color| match color {
-                GbColorVal::ID0 => COLOR_0,
-                GbColorVal::ID1 => COLOR_1,
-                GbColorVal::ID2 => COLOR_2,
-                GbColorVal::ID3 => COLOR_3,
+                GbMonoColor::White => WHITE,
+                GbMonoColor::LightGray => LIGHT_GRAY,
+                GbMonoColor::DarkGray => DARK_GRAY,
+                GbMonoColor::Black => BLACK,
             })
             .collect();
 
@@ -120,16 +121,16 @@ impl From<&FrameData> for ColorImage {
 
 impl Default for FrameData {
     fn default() -> Self {
-        let mut default_buf = [COLOR_0; FRAME_X * FRAME_Y];
+        let mut default_buf = [WHITE; FRAME_X * FRAME_Y];
 
         let mut cur_color = 0;
         for row in default_buf.chunks_mut(FRAME_X) {
             for col in row {
                 *col = match cur_color {
-                    0 => COLOR_0,
-                    1 => COLOR_1,
-                    2 => COLOR_2,
-                    3 => COLOR_3,
+                    0 => WHITE,
+                    1 => LIGHT_GRAY,
+                    2 => DARK_GRAY,
+                    3 => BLACK,
                     _ => panic!("Invalid color"),
                 }
             }
@@ -291,7 +292,7 @@ fn emulator_thread(
 
     let video = VideoOutput::new(dirty_flag, framebuf, ctx);
 
-    let ruboy = Ruboy::<StackAllocator, _, _>::new(reader, video)
+    let ruboy = Ruboy::<InlineAllocator, _, _>::new(reader, video)
         .context("Could not initialize Ruboy")
         .unwrap();
 

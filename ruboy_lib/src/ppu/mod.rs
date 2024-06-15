@@ -1,28 +1,40 @@
-use std::mem::size_of;
+use core::mem::size_of;
 
+use fetcher::{FetcherErr, PixelFetcher};
+use objectdata::ObjectData;
 use thiserror::Error;
+use tile::Tile;
 
 use crate::{
-    extern_traits::{
-        Frame, GBAllocator, GBGraphicsDrawer, GbColorVal, RomReader, FRAME_X, FRAME_Y,
-    },
+    extern_traits::{self, Frame, GBAllocator, GBGraphicsDrawer, RomReader, FRAME_X, FRAME_Y},
     memcontroller::{MemController, ReadError, OAM_START},
+    GbMonoColor,
 };
+
+mod fetcher;
+mod inlinequeue;
+mod objectdata;
+pub mod palette;
+mod tile;
+mod tilemap;
+
+const CYCLES_PER_LINE: usize = 456;
 
 #[derive(Debug, Clone)]
 enum PpuMode {
     Inactive,
-    HBlank(HBlankData),
-    VBlank(VBlankData),
+    /// Mode 0
+    HBlank,
+
+    /// Mode 1
+    VBlank,
+
+    /// Mode 2
     OAMScan(OAMScanData),
+
+    /// Mode 3
     Draw(DrawData),
 }
-
-#[derive(Debug, Clone)]
-struct HBlankData {}
-
-#[derive(Debug, Clone)]
-struct VBlankData {}
 
 #[derive(Debug, Clone)]
 struct OAMScanData {
@@ -30,82 +42,70 @@ struct OAMScanData {
     num_in_buf: u8,
     cur_obj_index: u8,
     cycles_left: u8,
+    window_check_done: bool,
+}
+
+impl OAMScanData {
+    pub fn new() -> Self {
+        Self {
+            buffer: [ObjectData::default(); 10],
+            num_in_buf: 0,
+            cur_obj_index: 0,
+            cycles_left: 0,
+            window_check_done: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
-struct DrawData {}
-
-#[derive(Debug, Clone, Copy)]
-struct Tile([u8; 16]);
-
-#[derive(Debug, Clone, Copy)]
-struct BackgroundMap([u8; 32 * 32]);
-
-#[derive(Debug, Clone, Copy, Default)]
-struct ObjectData([u8; 4]);
-
-impl ObjectData {
-    pub const fn y_pos(self) -> u8 {
-        self.0[0]
-    }
-
-    pub const fn offset_ypos(self) -> i16 {
-        ((self.y_pos() as u16) as i16) - 8
-    }
-
-    pub const fn x_pos(self) -> u8 {
-        self.0[1]
-    }
-
-    pub const fn offset_xpos(self) -> i16 {
-        ((self.x_pos() as u16) as i16) - 8
-    }
-
-    pub const fn tilenum(self) -> u8 {
-        self.0[2]
-    }
-
-    pub const fn flags(self) -> ObjDataFlags {
-        ObjDataFlags::from_byte(self.0[3])
-    }
+struct DrawData {
+    cur_x: u8,
+    fetcher_cycles_left: u8,
+    num_in_buf: u8,
+    buffer: [ObjectData; 10],
 }
 
-impl From<[u8; 4]> for ObjectData {
-    fn from(value: [u8; 4]) -> Self {
-        Self(value)
+impl DrawData {
+    pub fn new(obj_buffer: [ObjectData; 10], num_in_buf: u8) -> Self {
+        Self {
+            cur_x: 0,
+            fetcher_cycles_left: 0,
+            buffer: obj_buffer,
+            num_in_buf,
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-struct ObjDataFlags(u8);
+enum FetcherState {
+    FetchTileNumber,
+    FetchTileDataLo,
+    FetchTileDataHi,
+    Sleep,
+    PushFifo,
+}
 
-impl ObjDataFlags {
-    pub const fn from_byte(val: u8) -> ObjDataFlags {
-        Self(val)
+impl FetcherState {
+    pub fn new() -> Self {
+        FetcherState::FetchTileNumber
     }
 }
 
-impl From<u8> for ObjDataFlags {
-    fn from(value: u8) -> Self {
-        Self::from_byte(value)
-    }
-}
-
-impl From<ObjDataFlags> for u8 {
-    fn from(value: ObjDataFlags) -> Self {
-        value.0
-    }
+#[derive(Debug, Clone, Copy)]
+enum PaletteID {
+    Zero,
+    One,
 }
 
 const NUM_OAM_OBJECTS: u8 = 40;
 
 #[derive(Debug, Error)]
-pub enum PpuErr {
-    #[error("Error during VBlank: {0}")]
+pub enum PpuErr<V: GBGraphicsDrawer> {
+    #[error("Error during HBlank: {0}")]
     HBlank(#[from] HBlankErr),
 
-    #[error("Error during HBlank: {0}")]
-    VBlank(#[from] VBlankErr),
+    #[error("Error during VBlank: {0}")]
+    VBlank(#[from] VBlankErr<V>),
 
     #[error("Error during OAM scan: {0}")]
     OAMScan(#[from] OAMScanErr),
@@ -118,7 +118,10 @@ pub enum PpuErr {
 pub enum HBlankErr {}
 
 #[derive(Debug, Error)]
-pub enum VBlankErr {}
+pub enum VBlankErr<V: GBGraphicsDrawer> {
+    #[error("Error returned from graphics output: {0}")]
+    OutputErr(#[source] V::Err),
+}
 
 #[derive(Debug, Error)]
 pub enum OAMScanErr {
@@ -127,12 +130,51 @@ pub enum OAMScanErr {
 }
 
 #[derive(Debug, Error)]
-pub enum DrawErr {}
+pub enum DrawErr {
+    #[error("Error during pixel fetcher cycle: {0}")]
+    Fetcher(#[from] FetcherErr),
+}
 
+#[derive(Debug)]
 pub struct Ppu<V: GBGraphicsDrawer> {
     output: V,
     mode: PpuMode,
     framebuf: Frame,
+    line_data: LineData,
+    frame_data: FrameData,
+    pix_fetcher: PixelFetcher,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct LineData {
+    /// The number of the current cycle. First cycle is 1, etc.
+    cur_cycle: usize,
+}
+
+impl LineData {
+    pub fn new() -> Self {
+        LineData { cur_cycle: 0 }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FrameData {
+    /// The number of the current cycle. First cycle is 1, etc.
+    cur_cycle: usize,
+
+    /// Whether the window Y was reached. Checked at
+    /// the start of each OAM scan mode. Stays true until
+    /// VBlank, if set
+    win_y_reached: bool,
+}
+
+impl FrameData {
+    pub fn new() -> Self {
+        FrameData {
+            cur_cycle: 0,
+            win_y_reached: false,
+        }
+    }
 }
 
 impl<V: GBGraphicsDrawer> Ppu<V> {
@@ -141,6 +183,9 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             output,
             mode: PpuMode::Inactive,
             framebuf: Frame::default(),
+            line_data: LineData::new(),
+            frame_data: FrameData::new(),
+            pix_fetcher: PixelFetcher::new(),
         }
     }
 
@@ -151,12 +196,7 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         if should_be_active && !is_active {
             log::debug!("Turning PPU on, starting OAM scan");
 
-            self.mode = PpuMode::OAMScan(OAMScanData {
-                buffer: [ObjectData::default(); 10],
-                num_in_buf: 0,
-                cur_obj_index: 0,
-                cycles_left: 0,
-            })
+            self.mode = PpuMode::OAMScan(OAMScanData::new())
         } else if !should_be_active && is_active {
             log::debug!("Turning PPU off");
 
@@ -173,6 +213,12 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             _ => panic!("Invalid mode for OAM scan!"),
         };
 
+        if !data.window_check_done {
+            data.window_check_done = true;
+
+            self.frame_data.win_y_reached |= mem.io_registers.lcd_y == mem.io_registers.win_y;
+        }
+
         if data.cycles_left > 0 {
             // Wait for the operation to complete
             data.cycles_left -= 1;
@@ -183,7 +229,8 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             // Operation complete. If no more objects need to be scanned, go to next
             // phase
             log::debug!("OAM scan done, entering Draw mode");
-            self.mode = PpuMode::Draw(DrawData {});
+            mem.vram_open = false;
+            self.mode = PpuMode::Draw(DrawData::new(data.buffer, data.num_in_buf));
             return Ok(());
         }
 
@@ -227,11 +274,35 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
 
         Ok(())
     }
-
     fn draw(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
     ) -> Result<(), DrawErr> {
+        let data = match &mut self.mode {
+            PpuMode::Draw(data) => data,
+            _ => panic!("Invalid mode for drawing!"),
+        };
+
+        self.pix_fetcher.run_cycle(mem, &data.buffer, false)?;
+
+        if !self.pix_fetcher.get_bg_fifo().empty() {
+            let bg_pix = self.pix_fetcher.get_bg_fifo_mut().pop().unwrap();
+
+            self.framebuf.set_pix(
+                data.cur_x,
+                mem.io_registers.lcd_y,
+                GbMonoColor::from_id(bg_pix, None),
+            );
+        }
+
+        data.cur_x += 1;
+
+        if data.cur_x as usize == FRAME_X {
+            mem.vram_open = true;
+            mem.oam_open = true;
+            self.mode = PpuMode::HBlank;
+        }
+
         Ok(())
     }
 
@@ -239,26 +310,64 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
     ) -> Result<(), HBlankErr> {
+        if self.line_data.cur_cycle == CYCLES_PER_LINE {
+            self.line_data = LineData::new();
+            mem.io_registers.lcd_y += 1;
+
+            if mem.io_registers.lcd_y as usize == FRAME_Y {
+                self.mode = PpuMode::VBlank;
+            } else {
+                mem.oam_open = false;
+                self.mode = PpuMode::OAMScan(OAMScanData::new());
+            }
+        }
+
         Ok(())
     }
 
     fn vblank(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
-    ) -> Result<(), VBlankErr> {
+    ) -> Result<(), VBlankErr<V>> {
+        if self.line_data.cur_cycle == CYCLES_PER_LINE {
+            self.line_data = LineData::new();
+
+            if mem.io_registers.lcd_y as usize == FRAME_Y + 8 {
+                mem.io_registers.lcd_y = 0;
+
+                self.output
+                    .output(&self.framebuf)
+                    .map_err(|e| VBlankErr::<V>::OutputErr(e))?;
+
+                self.frame_data = FrameData::new();
+
+                mem.oam_open = false;
+                self.mode = PpuMode::OAMScan(OAMScanData::new());
+
+                self.pix_fetcher.vblank_reset();
+            } else {
+                mem.io_registers.lcd_y += 1;
+            }
+        }
+
         Ok(())
     }
 
     pub fn run_cycle(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
-    ) -> Result<(), PpuErr> {
+    ) -> Result<(), PpuErr<V>> {
         self.sync_active_state(mem);
+
+        if !matches!(self.mode, PpuMode::Inactive) {
+            self.line_data.cur_cycle += 1;
+            self.frame_data.cur_cycle += 1;
+        }
 
         match &mut self.mode {
             PpuMode::Inactive => {}
-            PpuMode::HBlank(_) => self.hblank(mem)?,
-            PpuMode::VBlank(_) => self.vblank(mem)?,
+            PpuMode::HBlank => self.hblank(mem)?,
+            PpuMode::VBlank => self.vblank(mem)?,
             PpuMode::OAMScan(_) => self.oam_scan(mem)?,
             PpuMode::Draw(_) => self.draw(mem)?,
         }

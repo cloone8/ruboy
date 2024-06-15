@@ -5,10 +5,12 @@ use std::{
     io::{Read, Seek},
 };
 
+use crate::ppu::palette::Palette;
+
 /// Trait representing something that can read a ROM.
 /// Used internally by the Ruboy ROM memory-bank-controllers to read the data
 /// for each bank into memory dynamically.
-pub trait RomReader {
+pub trait RomReader: Debug {
     /// The error that can be returned by this reader.
     type Err: Error + 'static;
 
@@ -38,7 +40,7 @@ pub trait RomReader {
 
 impl<T> RomReader for T
 where
-    T: Read + Seek,
+    T: Read + Seek + Debug,
 {
     type Err = std::io::Error;
 
@@ -60,8 +62,8 @@ where
 /// Usually not required to implement directly, but can be useful if a custom memory
 /// allocator is used.
 ///
-/// See the two provided implementations: [StackAllocator] and [BoxAllocator]
-pub trait GBAllocator {
+/// See the two provided implementations: [InlineAllocator] and [BoxAllocator]
+pub trait GBAllocator: Debug {
     /// The type of the memory created by this allocator. For example [T; N] or Box<[T; N]>
     type Mem<T: Copy + Debug, const N: usize>: GBRam<T> + Debug;
 
@@ -136,9 +138,10 @@ impl<T: Copy + Debug, R: GBRam<T>> GBRam<T> for Box<R> {
     }
 }
 
-pub struct StackAllocator;
+#[derive(Debug)]
+pub struct InlineAllocator;
 
-impl GBAllocator for StackAllocator {
+impl GBAllocator for InlineAllocator {
     type Mem<T: Copy + Debug, const N: usize> = [T; N];
 
     fn clone_from<T: Copy + Debug, const N: usize>(orig: &T) -> Self::Mem<T, N> {
@@ -150,6 +153,7 @@ impl GBAllocator for StackAllocator {
     }
 }
 
+#[derive(Debug)]
 pub struct BoxAllocator;
 
 impl GBAllocator for BoxAllocator {
@@ -169,37 +173,75 @@ pub const FRAME_Y: usize = 144;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
-pub enum GbColorVal {
-    ID0 = 0,
-    ID1 = 1,
-    ID2 = 2,
-    ID3 = 3,
+pub enum GbMonoColor {
+    White = 0,
+    LightGray = 1,
+    DarkGray = 2,
+    Black = 3,
+}
+
+impl GbMonoColor {
+    pub const fn from_id(id: GbColorID, palette: Option<Palette>) -> Self {
+        match palette {
+            Some(_) => todo!(),
+            None => match id {
+                GbColorID::ID0 => Self::White,
+                GbColorID::ID1 => Self::LightGray,
+                GbColorID::ID2 => Self::DarkGray,
+                GbColorID::ID3 => Self::Black,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum GbColorID {
+    ID0,
+    ID1,
+    ID2,
+    ID3,
+}
+
+impl TryFrom<u8> for GbColorID {
+    type Error = ();
+
+    fn try_from(value: u8) -> Result<Self, ()> {
+        let cid = match value {
+            0 => GbColorID::ID0,
+            1 => GbColorID::ID1,
+            2 => GbColorID::ID2,
+            3 => GbColorID::ID3,
+            _ => return Err(()),
+        };
+
+        Ok(cid)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct Frame {
-    pixels: [GbColorVal; FRAME_X * FRAME_Y],
+    pixels: [GbMonoColor; (FRAME_X as usize) * (FRAME_Y as usize)],
 }
 
 impl Frame {
-    pub fn get_raw(&self) -> &[GbColorVal] {
+    pub fn get_raw(&self) -> &[GbMonoColor] {
         &self.pixels
     }
 
-    pub fn get_raw_mut(&mut self) -> &mut [GbColorVal] {
+    pub fn get_raw_mut(&mut self) -> &mut [GbMonoColor] {
         &mut self.pixels
     }
 
-    pub fn get_pix(&self, x: usize, y: usize) -> Option<GbColorVal> {
-        if x >= FRAME_X || y >= FRAME_Y {
+    pub fn get_pix(&self, x: u8, y: u8) -> Option<GbMonoColor> {
+        if x as usize >= FRAME_X || y as usize >= FRAME_Y {
             return None;
         }
 
-        Some(self.pixels[(y * FRAME_X) + x])
+        Some(self.pixels[(y as usize * FRAME_X) + x as usize])
     }
 
-    pub fn set_pix(&mut self, x: usize, y: usize, val: GbColorVal) {
-        if x >= FRAME_X || y >= FRAME_Y {
+    pub fn set_pix(&mut self, x: u8, y: u8, val: GbMonoColor) {
+        if x as usize >= FRAME_X || y as usize >= FRAME_Y {
             log::warn!(
                 "Attempt to set pixel outside of framebuffer at X={} Y={}",
                 x,
@@ -208,19 +250,19 @@ impl Frame {
             return;
         }
 
-        self.pixels[(y * FRAME_X) + x] = val;
+        self.pixels[(y as usize * FRAME_X) + x as usize] = val;
     }
 }
 
 impl Default for Frame {
     fn default() -> Self {
         Self {
-            pixels: [GbColorVal::ID0; FRAME_X * FRAME_Y],
+            pixels: [GbMonoColor::White; FRAME_X * FRAME_Y],
         }
     }
 }
 
-pub trait GBGraphicsDrawer {
-    type Err: Error;
+pub trait GBGraphicsDrawer: Debug {
+    type Err: Error + 'static;
     fn output(&mut self, frame: &Frame) -> Result<(), Self::Err>;
 }

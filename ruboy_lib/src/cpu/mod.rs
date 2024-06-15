@@ -486,10 +486,21 @@ impl Cpu {
             Instruction::SetCarryFlag => instr_todo!(instr),
             Instruction::ComplementCarry => instr_todo!(instr),
             Instruction::Rst(_) => instr_todo!(instr),
-            Instruction::RotLeftCircularA => todo!(),
-            Instruction::RotRightCircularA => todo!(),
-            Instruction::RotLeftA => todo!(),
-            Instruction::RotRightA => todo!(),
+            Instruction::RotLeftCircularA => instr_todo!(instr),
+            Instruction::RotRightCircularA => instr_todo!(instr),
+            Instruction::RotLeftA => {
+                let cur_val = self.registers.a();
+                let (shifted, overflown) = cur_val.overflowing_shl(1);
+                let result = shifted | (self.registers.carry_flag() as u8);
+
+                self.registers
+                    .set_flags(result == 0, false, false, overflown);
+
+                self.registers.set_a(result);
+
+                false
+            }
+            Instruction::RotRightA => instr_todo!(instr),
             Instruction::IllegalInstruction(illegal) => {
                 return Err(CpuErr::Illegal(illegal));
             }

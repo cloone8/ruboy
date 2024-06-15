@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::ppu::palette::Palette;
+
 use super::interrupts::Interrupts;
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -136,6 +138,15 @@ pub struct IoRegs {
     /// 0xFF45
     pub lcd_y_comp: u8,
 
+    /// 0xFF47
+    pub bg_palette: Palette,
+
+    /// 0xFF48
+    pub obj0_palette: Palette,
+
+    /// 0xFF49
+    pub obj1_palette: Palette,
+
     /// 0xFF4A
     pub win_y: u8,
 
@@ -162,6 +173,9 @@ impl IoRegs {
             scx: 0,
             lcd_y: 0,
             lcd_y_comp: 0,
+            bg_palette: Palette::new(),
+            obj0_palette: Palette::new(),
+            obj1_palette: Palette::new(),
             win_y: 0,
             win_x: 0,
             boot_rom_enabled: cfg!(feature = "boot_img_enabled"),
@@ -177,6 +191,9 @@ impl IoRegs {
             0xFF43 => self.scx = val,
             0xFF44 => self.lcd_y = val,
             0xFF45 => self.lcd_y_comp = val,
+            0xFF47 => self.bg_palette = val.into(),
+            0xFF48 => self.obj0_palette = val.into(),
+            0xFF49 => self.obj1_palette = val.into(),
             0xFF4A => self.win_y = val,
             0xFF4B => self.win_x = val,
             0xFF50 => {
@@ -204,6 +221,9 @@ impl IoRegs {
             0xFF43 => Ok(self.scx),
             0xFF44 => Ok(self.lcd_y),
             0xFF45 => Ok(self.lcd_y_comp),
+            0xFF47 => Ok(self.bg_palette.into()),
+            0xFF48 => Ok(self.obj0_palette.into()),
+            0xFF49 => Ok(self.obj1_palette.into()),
             0xFF4A => Ok(self.win_y),
             0xFF4B => Ok(self.win_x),
             0xFF80.. => panic!("Too high for I/O range"),

@@ -40,6 +40,13 @@ pub struct MemController<A: GBAllocator, R: RomReader> {
     oam: A::Mem<u8, { OAM_SIZE as usize }>,
     hram: A::Mem<u8, { HRAM_SIZE as usize }>,
     interrupts_enabled: Interrupts,
+
+    /// If true, CPU can access VRAM
+    pub vram_open: bool,
+
+    /// If true, CPU can access OAM mem
+    pub oam_open: bool,
+
     pub io_registers: IoRegs,
 }
 
@@ -173,6 +180,8 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             hram: A::empty(),
             io_registers: IoRegs::new(),
             interrupts_enabled: Interrupts::default(),
+            vram_open: true,
+            oam_open: true,
         })
     }
 
