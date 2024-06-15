@@ -382,7 +382,7 @@ pub fn decode<T: DecoderReadable>(mem: &T, pc: u16) -> Result<Instruction, T::Er
         0x03 => Instruction::Inc(IncDecTarget::Reg16(Reg16::BC)),
         0x04 => Instruction::Inc(IncDecTarget::Reg8(Reg8::B)),
         0x05 => Instruction::Dec(IncDecTarget::Reg8(Reg8::B)),
-        0x06 => Instruction::Load8(Ld8Dst::Reg(Reg8::C), Ld8Src::Imm(read8(mem, pc + 1)?)),
+        0x06 => Instruction::Load8(Ld8Dst::Reg(Reg8::B), Ld8Src::Imm(read8(mem, pc + 1)?)),
         0x07 => Instruction::RotLeftCircularA,
         0x08 => Instruction::Load16(
             Ld16Dst::Mem(MemLoc::Imm(read16(mem, pc + 1)?)),
