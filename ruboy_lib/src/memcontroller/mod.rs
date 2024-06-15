@@ -239,7 +239,11 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
         match self.map_to_region(addr) {
             MemRegion::BootRom => Ok(boot::IMAGE[addr as usize]),
             MemRegion::Cartridge => self.rom.read(addr).map_err(|e| self.r_err(addr, e)),
-            MemRegion::VRam => Ok(self.vram.read(addr - VRAM_START)),
+            MemRegion::VRam => {
+                let res = self.vram.read(addr - VRAM_START);
+                // log::info!("Reading from VRAM @ 0x{:x}: 0x{:x}", addr, res);
+                Ok(res)
+            }
             MemRegion::WorkRam => Ok(self.ram.read(addr - WORKRAM_START)),
             MemRegion::EchoRam => unimplemented_read!(MemRegion::EchoRam),
             MemRegion::ObjectAttrMem => Ok(self.oam.read(addr - OAM_START)),
@@ -265,6 +269,7 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             MemRegion::BootRom => Err(self.w_err(addr, WriteErrType::ReadOnly)),
             MemRegion::Cartridge => self.rom.write(addr, value).map_err(|e| self.w_err(addr, e)),
             MemRegion::VRam => {
+                // log::info!("Writing into VRAM @ 0x{:x}: 0x{:x}", addr, value);
                 self.vram.write(addr - VRAM_START, value);
                 Ok(())
             }

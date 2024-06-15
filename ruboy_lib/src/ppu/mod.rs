@@ -293,9 +293,9 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
                 mem.io_registers.lcd_y,
                 GbMonoColor::from_id(bg_pix, None),
             );
-        }
 
-        data.cur_x += 1;
+            data.cur_x += 1;
+        }
 
         if data.cur_x as usize == FRAME_X {
             mem.vram_open = true;
@@ -313,6 +313,8 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         if self.line_data.cur_cycle == CYCLES_PER_LINE {
             self.line_data = LineData::new();
             mem.io_registers.lcd_y += 1;
+
+            self.pix_fetcher.hblank_reset();
 
             if mem.io_registers.lcd_y as usize == FRAME_Y {
                 self.mode = PpuMode::VBlank;

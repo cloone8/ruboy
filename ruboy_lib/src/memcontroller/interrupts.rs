@@ -25,22 +25,22 @@ impl Interrupts {
 
     #[inline]
     pub fn lcd(self) -> bool {
-        self.get(0b01)
+        self.get(0b10)
     }
 
     #[inline]
     pub fn timer(self) -> bool {
-        self.get(0b001)
+        self.get(0b100)
     }
 
     #[inline]
     pub fn serial(self) -> bool {
-        self.get(0b0001)
+        self.get(0b1000)
     }
 
     #[inline]
     pub fn joypad(self) -> bool {
-        self.get(0b00001)
+        self.get(0b10000)
     }
 
     #[inline]
@@ -50,22 +50,22 @@ impl Interrupts {
 
     #[inline]
     pub fn set_lcd(&mut self, val: bool) {
-        self.set(0b01, val)
+        self.set(0b10, val)
     }
 
     #[inline]
     pub fn set_timer(&mut self, val: bool) {
-        self.set(0b001, val)
+        self.set(0b100, val)
     }
 
     #[inline]
     pub fn set_serial(&mut self, val: bool) {
-        self.set(0b0001, val)
+        self.set(0b1000, val)
     }
 
     #[inline]
     pub fn set_joypad(&mut self, val: bool) {
-        self.set(0b00001, val)
+        self.set(0b10000, val)
     }
 }
 

@@ -41,37 +41,37 @@ impl LcdControl {
 
     #[inline]
     pub const fn obj_enable(self) -> bool {
-        self.get(0b01)
+        self.get(0b10)
     }
 
     #[inline]
     pub const fn obj_size(self) -> bool {
-        self.get(0b001)
+        self.get(0b100)
     }
 
     #[inline]
     pub const fn bg_tilemap_area(self) -> bool {
-        self.get(0b0001)
+        self.get(0b1000)
     }
 
     #[inline]
     pub const fn bg_window_tile_area(self) -> bool {
-        self.get(0b00001)
+        self.get(0b10000)
     }
 
     #[inline]
     pub const fn window_enable(self) -> bool {
-        self.get(0b000001)
+        self.get(0b100000)
     }
 
     #[inline]
     pub const fn window_tilemap_area(self) -> bool {
-        self.get(0b0000001)
+        self.get(0b1000000)
     }
 
     #[inline]
     pub const fn lcd_ppu_enable(self) -> bool {
-        self.get(0b00000001)
+        self.get(0b10000000)
     }
 
     #[inline]
@@ -81,37 +81,37 @@ impl LcdControl {
 
     #[inline]
     pub fn set_obj_enable(&mut self, val: bool) {
-        self.set(0b01, val)
+        self.set(0b10, val)
     }
 
     #[inline]
     pub fn set_obj_size(&mut self, val: bool) {
-        self.set(0b001, val)
+        self.set(0b100, val)
     }
 
     #[inline]
     pub fn set_bg_tilemap_area(&mut self, val: bool) {
-        self.set(0b0001, val)
+        self.set(0b1000, val)
     }
 
     #[inline]
     pub fn set_bg_window_tile_area(&mut self, val: bool) {
-        self.set(0b00001, val)
+        self.set(0b10000, val)
     }
 
     #[inline]
     pub fn set_window_enable(&mut self, val: bool) {
-        self.set(0b000001, val)
+        self.set(0b100000, val)
     }
 
     #[inline]
     pub fn set_window_tilemap_area(&mut self, val: bool) {
-        self.set(0b0000001, val)
+        self.set(0b1000000, val)
     }
 
     #[inline]
     pub fn set_lcd_ppu_enable(&mut self, val: bool) {
-        self.set(0b00000001, val)
+        self.set(0b10000000, val)
     }
 }
 
@@ -189,7 +189,7 @@ impl IoRegs {
             0xFF41 => self.lcd_stat = val,
             0xFF42 => self.scy = val,
             0xFF43 => self.scx = val,
-            0xFF44 => self.lcd_y = val,
+            // 0xFF44 => self.lcd_y = val,
             0xFF45 => self.lcd_y_comp = val,
             0xFF47 => self.bg_palette = val.into(),
             0xFF48 => self.obj0_palette = val.into(),
@@ -198,14 +198,14 @@ impl IoRegs {
             0xFF4B => self.win_x = val,
             0xFF50 => {
                 if self.boot_rom_enabled && val != 0 {
-                    log::debug!("Disabling boot ROM");
+                    log::info!("Disabling boot ROM");
                 }
 
                 self.boot_rom_enabled = self.boot_rom_enabled && val == 0; // Disable boot-rom if non-zero is written
             }
             0xFF80.. => panic!("Too high for I/O range"),
             _ => {
-                log::debug!("I/O register not implemented for writing: 0x{:x}", addr);
+                log::info!("I/O register not implemented for writing: 0x{:x}", addr);
             }
         };
 
@@ -228,7 +228,7 @@ impl IoRegs {
             0xFF4B => Ok(self.win_x),
             0xFF80.. => panic!("Too high for I/O range"),
             _ => {
-                log::debug!(
+                log::info!(
                     "I/O register not implemented for reading: 0x{:x}, returning 0xFF",
                     addr
                 );

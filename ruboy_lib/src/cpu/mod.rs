@@ -243,20 +243,42 @@ impl Cpu {
             Instruction::Halt => instr_todo!(instr),
             Instruction::EI => instr_todo!(instr),
             Instruction::DI => instr_todo!(instr),
-            Instruction::Add(_) => instr_todo!(instr),
+            Instruction::Add(src) => {
+                let base = self.registers.a();
+                let val = self.get_arith_src(mem, src)?;
+
+                let (res, carry) = base.overflowing_add(val);
+                let zero = res == 0;
+
+                self.registers
+                    .set_flags(zero, false, halfcarry8_add(base, val), carry);
+
+                self.registers.set_a(res);
+
+                false
+            }
             Instruction::AddCarry(_) => instr_todo!(instr),
             Instruction::AddHL(_) => instr_todo!(instr),
             Instruction::AddSP(_) => instr_todo!(instr),
-            Instruction::Sub(_) => instr_todo!(instr),
+            Instruction::Sub(src) => {
+                let base = self.registers.a();
+                let val = self.get_arith_src(mem, src)?;
+
+                let (res, carry) = base.overflowing_sub(val);
+                let zero = res == 0;
+
+                self.registers
+                    .set_flags(zero, true, halfcarry8_sub(base, val), carry);
+
+                self.registers.set_a(res);
+
+                false
+            }
             Instruction::SubCarry(_) => instr_todo!(instr),
             Instruction::And(_) => instr_todo!(instr),
             Instruction::Or(_) => instr_todo!(instr),
             Instruction::Xor(src) => {
-                let val = match src {
-                    ArithSrc::Reg(reg) => self.get_reg8_value(reg),
-                    ArithSrc::Imm(imm) => imm,
-                    ArithSrc::Mem(_) => instr_todo!(instr),
-                };
+                let val = self.get_arith_src(mem, src)?;
 
                 let xord = self.registers.a() ^ val;
 

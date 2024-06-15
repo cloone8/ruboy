@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     memcontroller::{MemController, ReadError},
-    ppu::tilemap,
+    ppu::{tile, tilemap},
     GBAllocator, GbColorID, GbMonoColor, RomReader,
 };
 
@@ -98,6 +98,10 @@ impl PixelFetcher {
         self.window_lines_drawn = 0;
     }
 
+    pub fn hblank_reset(&mut self) {
+        self.x_pos = 0;
+    }
+
     fn fetch_tile(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
@@ -126,7 +130,7 @@ impl PixelFetcher {
             }
             false => (
                 ((mem.io_registers.scx / 8) + self.x_pos) & 0x1F,
-                (mem.io_registers.lcd_y + mem.io_registers.scy),
+                ((mem.io_registers.scy + mem.io_registers.lcd_y) / 8),
             ),
         };
 
@@ -151,7 +155,7 @@ impl PixelFetcher {
         };
 
         let tile = get_tile_by_idx(data.tile_idx, mem)?;
-        let tile_line = mem.io_registers.lcd_y % (Tile::Y_SIZE as u8);
+        let tile_line = (mem.io_registers.lcd_y + mem.io_registers.scy) % (Tile::Y_SIZE as u8);
 
         let pix_lower = tile.get_lower_for_row(tile_line);
 
@@ -173,21 +177,13 @@ impl PixelFetcher {
         };
 
         let tile = get_tile_by_idx(data.tile_idx, mem)?;
-        let tile_line = mem.io_registers.lcd_y % (Tile::Y_SIZE as u8);
+        let tile_line = (mem.io_registers.lcd_y + mem.io_registers.scy) % (Tile::Y_SIZE as u8);
 
         let pix_lower = data.lower;
         let pix_upper = tile.get_upper_for_row(tile_line);
 
-        let pix_ids: [GbColorID; 8] = std::array::from_fn(|i| {
-            let id_mask: u8 = 0b1 << i;
-            let lower_val = (pix_lower & id_mask) >> i;
-            let upper_val = (pix_upper & id_mask) >> i;
-
-            debug_assert!(lower_val == 0 || lower_val == 1);
-            debug_assert!(upper_val == 0 || upper_val == 1);
-
-            GbColorID::try_from(lower_val + (upper_val << 1)).unwrap()
-        });
+        let pix_ids: [GbColorID; 8] =
+            std::array::from_fn(|i| combine_pixdata(pix_lower, pix_upper, i));
 
         self.phase = Phase::Sleep(pix_ids);
 
@@ -202,12 +198,15 @@ impl PixelFetcher {
             return Ok(());
         }
 
-        let pixels = match self.phase {
+        let mut pixels = match self.phase {
             Phase::Push(pixels) => pixels,
             _ => panic!("Invalid mode for push!"),
         };
 
+        pixels.reverse();
+
         self.bg_fifo.push_n(pixels).unwrap();
+        self.x_pos += 1;
 
         self.phase = Phase::FetchTile;
 
@@ -262,12 +261,7 @@ impl PixelFetcher {
     }
 }
 
-fn get_tile_by_idx(
-    tile_idx: u8,
-    mem: &MemController<impl GBAllocator, impl RomReader>,
-) -> Result<Tile, ReadError> {
-    let addressing_mode = mem.io_registers.lcd_control.bg_window_tile_area();
-
+fn addr_from_tile_idx(tile_idx: u8, addressing_mode: bool) -> u16 {
     let tile_addr_usize = match addressing_mode {
         true => 0x8000 + ((tile_idx as usize) * size_of::<Tile>()),
         false => {
@@ -275,9 +269,72 @@ fn get_tile_by_idx(
         }
     };
 
-    let tile_addr = u16::try_from(tile_addr_usize).unwrap();
+    u16::try_from(tile_addr_usize).unwrap()
+}
+
+fn get_tile_by_idx(
+    tile_idx: u8,
+    mem: &MemController<impl GBAllocator, impl RomReader>,
+) -> Result<Tile, ReadError> {
+    let addressing_mode = mem.io_registers.lcd_control.bg_window_tile_area();
+    let tile_addr = addr_from_tile_idx(tile_idx, addressing_mode);
+
+    // log::info!("Getting tile {} at 0x{:x}", tile_idx, tile_addr);
 
     let tile_bytes: [u8; size_of::<Tile>()] = mem.read_range(tile_addr)?;
 
     Ok(tile_bytes.into())
+}
+
+fn combine_pixdata(lower: u8, upper: u8, idx: usize) -> GbColorID {
+    debug_assert!(idx < 8);
+
+    let id_mask: u8 = 0b1 << idx;
+    let lower_val = (lower & id_mask) >> idx;
+    let upper_val = (upper & id_mask) >> idx;
+
+    debug_assert!(lower_val == 0 || lower_val == 1);
+    debug_assert!(upper_val == 0 || upper_val == 1);
+
+    GbColorID::try_from(lower_val + (upper_val << 1)).unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pix_combine() {
+        let lower = 0b10100101_u8;
+        let upper = 0b11000011_u8;
+
+        assert_eq!(GbColorID::ID3, combine_pixdata(lower, upper, 0));
+        assert_eq!(GbColorID::ID2, combine_pixdata(lower, upper, 1));
+        assert_eq!(GbColorID::ID1, combine_pixdata(lower, upper, 2));
+        assert_eq!(GbColorID::ID0, combine_pixdata(lower, upper, 3));
+        assert_eq!(GbColorID::ID0, combine_pixdata(lower, upper, 4));
+        assert_eq!(GbColorID::ID1, combine_pixdata(lower, upper, 5));
+        assert_eq!(GbColorID::ID2, combine_pixdata(lower, upper, 6));
+        assert_eq!(GbColorID::ID3, combine_pixdata(lower, upper, 7));
+    }
+
+    #[test]
+    fn test_addressing_mode_zero() {
+        assert_eq!(0x9000, addr_from_tile_idx(0, false));
+        assert_eq!(0x8800, addr_from_tile_idx(128, false));
+        assert_eq!(
+            (0x9000 - size_of::<Tile>() as u16),
+            addr_from_tile_idx(255, false)
+        );
+    }
+
+    #[test]
+    fn test_addressing_mode_one() {
+        assert_eq!(0x8000, addr_from_tile_idx(0, true));
+        assert_eq!(0x8800, addr_from_tile_idx(128, true));
+        assert_eq!(
+            (0x9000 - size_of::<Tile>() as u16),
+            addr_from_tile_idx(255, true)
+        );
+    }
 }

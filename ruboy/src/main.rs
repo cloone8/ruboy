@@ -57,10 +57,10 @@ impl Error for VideoOutputErr {
     }
 }
 
-const WHITE: Color32 = Color32::from_gray(255);
-const LIGHT_GRAY: Color32 = Color32::from_gray(170);
-const DARK_GRAY: Color32 = Color32::from_gray(85);
-const BLACK: Color32 = Color32::from_gray(0);
+const WHITE: Color32 = Color32::from_rgb(155, 188, 15);
+const LIGHT_GRAY: Color32 = Color32::from_rgb(139, 172, 15);
+const DARK_GRAY: Color32 = Color32::from_rgb(48, 98, 14);
+const BLACK: Color32 = Color32::from_rgb(15, 56, 15);
 
 impl GBGraphicsDrawer for VideoOutput {
     type Err = VideoOutputErr;
@@ -124,18 +124,16 @@ impl Default for FrameData {
         let mut default_buf = [WHITE; FRAME_X * FRAME_Y];
 
         let mut cur_color = 0;
-        for row in default_buf.chunks_mut(FRAME_X) {
-            for col in row {
-                *col = match cur_color {
-                    0 => WHITE,
-                    1 => LIGHT_GRAY,
-                    2 => DARK_GRAY,
-                    3 => BLACK,
-                    _ => panic!("Invalid color"),
-                }
+        for (y, row) in default_buf.chunks_mut(FRAME_X).enumerate() {
+            for (x, pixel) in row.iter_mut().enumerate() {
+                *pixel = Color32::from_rgb(
+                    ((x as f64) / (FRAME_X as f64) * 255.0) as u8,
+                    ((y as f64) / (FRAME_Y as f64) * 255.0) as u8,
+                    0,
+                )
             }
 
-            cur_color = (cur_color + 1) % 4;
+            cur_color = i32::min(3, cur_color + 1);
         }
 
         Self { buf: default_buf }

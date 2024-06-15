@@ -194,7 +194,7 @@ impl GbMonoColor {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GbColorID {
     ID0,
     ID1,
@@ -220,7 +220,7 @@ impl TryFrom<u8> for GbColorID {
 
 #[derive(Debug, Clone)]
 pub struct Frame {
-    pixels: [GbMonoColor; (FRAME_X as usize) * (FRAME_Y as usize)],
+    pixels: [GbMonoColor; FRAME_X * FRAME_Y],
 }
 
 impl Frame {
@@ -241,6 +241,7 @@ impl Frame {
     }
 
     pub fn set_pix(&mut self, x: u8, y: u8, val: GbMonoColor) {
+        // log::info!("Setting pix {},{} to {:?}", x, y, val);
         if x as usize >= FRAME_X || y as usize >= FRAME_Y {
             log::warn!(
                 "Attempt to set pixel outside of framebuffer at X={} Y={}",
