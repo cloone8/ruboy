@@ -205,14 +205,14 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
 
     fn map_to_region(&self, addr: u16) -> MemRegion {
         match addr {
-            0x0..=0xFE => {
+            0x0..=0xFF => {
                 if self.io_registers.boot_rom_enabled {
                     MemRegion::BootRom
                 } else {
                     MemRegion::Cartridge
                 }
             }
-            0xFF..=0x7FFF => MemRegion::Cartridge,
+            0x100..=0x7FFF => MemRegion::Cartridge,
             0x8000..=0x9FFF => MemRegion::VRam,
             0xA000..=0xBFFF => MemRegion::Cartridge,
             0xC000..=0xDFFF => MemRegion::WorkRam,
