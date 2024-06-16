@@ -708,7 +708,7 @@ impl Cpu {
             // with the lower 5 bits, because the upper 3 are unused
             // and thus do not actually correspond to an interrupt
             if u8::from(to_service) & 0b00011111 != 0 {
-                log::warn!("Handling interrupt! 0b{:b}", u8::from(to_service));
+                log::debug!("Handling interrupt! 0b{:b}", u8::from(to_service));
                 self.interrupts_master = false;
 
                 let handler_addr: u16 = if to_service.vblank() {

@@ -273,7 +273,7 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
     }
 
     fn get_obj_at_x(objs: &mut [ObjectData], x: u8) -> Option<ObjectData> {
-        let idx = objs.iter().position(|obj| x as i16 == obj.offset_xpos());
+        let idx = objs.iter().position(|obj| obj.offset_xpos() <= x as i16);
 
         match idx {
             Some(idx) => {

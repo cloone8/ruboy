@@ -13,7 +13,7 @@ use super::{inlinequeue::InlineQueue, objectdata::ObjectData, palette::PaletteID
 #[derive(Debug)]
 pub struct PixelFetcher {
     cycles_left: u8,
-    x_pos: u8,
+    bg_win_x_pos: u8,
     window_lines_drawn: u8,
     win_x_reached: bool,
     object_to_fetch: Option<ObjectData>,
@@ -80,7 +80,7 @@ impl PixelFetcher {
     pub fn new() -> Self {
         Self {
             cycles_left: 0,
-            x_pos: 0,
+            bg_win_x_pos: 0,
             win_x_reached: false,
             window_lines_drawn: 0,
             object_to_fetch: None,
@@ -106,7 +106,7 @@ impl PixelFetcher {
     }
 
     pub fn hblank_reset(&mut self) {
-        self.x_pos = 0;
+        self.bg_win_x_pos = 0;
         self.bg_fifo.clear();
         self.obj_fifo.clear();
     }
@@ -155,7 +155,7 @@ impl PixelFetcher {
         };
 
         let (x, y) = (
-            ((mem.io_registers.scx / 8) + self.x_pos) & 0x1F,
+            ((mem.io_registers.scx / 8) + self.bg_win_x_pos) & 0x1F,
             ((mem.io_registers.scy + mem.io_registers.lcd_y) / 8),
         );
 
@@ -246,6 +246,8 @@ impl PixelFetcher {
         if self.is_fetching_obj() {
             let obj = self.object_to_fetch.take().unwrap();
             let occupied_slots = self.obj_fifo.len();
+            let obj_pix_on_screen = u8::min(obj.x_pos(), 8);
+            let pix_to_skip = usize::max(occupied_slots, obj_pix_on_screen as usize);
 
             if obj.flags().x_flip() {
                 pixels.reverse();
@@ -253,7 +255,7 @@ impl PixelFetcher {
 
             // TODO: Obj y-flip
 
-            pixels.into_iter().skip(occupied_slots).for_each(|pix| {
+            pixels.into_iter().skip(pix_to_skip).for_each(|pix| {
                 self.obj_fifo
                     .push(FetchedPixel {
                         color: pix,
@@ -264,7 +266,7 @@ impl PixelFetcher {
             });
         } else {
             self.bg_fifo.push_n(pixels).unwrap();
-            self.x_pos += 1;
+            self.bg_win_x_pos += 1;
         }
 
         self.phase = Phase::FetchTile;
