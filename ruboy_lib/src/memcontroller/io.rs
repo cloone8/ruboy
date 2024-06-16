@@ -117,6 +117,9 @@ impl LcdControl {
 
 #[derive(Debug)]
 pub struct IoRegs {
+    /// 0xFF00
+    pub joypad: u8,
+
     /// 0xFF0F
     pub interrupts_requested: Interrupts,
 
@@ -166,6 +169,7 @@ pub enum IoReadErr {}
 impl IoRegs {
     pub fn new() -> Self {
         Self {
+            joypad: 0,
             interrupts_requested: Interrupts::default(),
             lcd_control: LcdControl::default(),
             lcd_stat: 0,
@@ -185,6 +189,7 @@ impl IoRegs {
     pub fn write(&mut self, addr: u16, val: u8) -> Result<(), IoWriteErr> {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
+            0xFF00 => self.joypad = val,
             0xFF40 => self.lcd_control = val.into(),
             0xFF41 => self.lcd_stat = val,
             0xFF42 => self.scy = val,
@@ -215,6 +220,7 @@ impl IoRegs {
     pub fn read(&self, addr: u16) -> Result<u8, IoReadErr> {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
+            0xFF00 => Ok(0xFF),
             0xFF40 => Ok(self.lcd_control.into()),
             0xFF41 => Ok(self.lcd_stat),
             0xFF42 => Ok(self.scy),
@@ -229,10 +235,10 @@ impl IoRegs {
             0xFF80.. => panic!("Too high for I/O range"),
             _ => {
                 log::info!(
-                    "I/O register not implemented for reading: 0x{:x}, returning 0xFF",
+                    "I/O register not implemented for reading: 0x{:x}, returning 0x00",
                     addr
                 );
-                Ok(0xFF)
+                Ok(0x00)
             }
         }
     }

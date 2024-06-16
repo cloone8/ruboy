@@ -40,9 +40,11 @@ impl<T, const N: usize> InlineQueue<T, N> {
     }
 
     pub fn clear(&mut self) {
-        for _ in 0..self.len() {
-            _ = self.pop().unwrap();
+        for i in 0..N {
+            self.data[i] = None;
         }
+
+        self.cur_elements = 0;
     }
 
     pub const fn len(&self) -> usize {

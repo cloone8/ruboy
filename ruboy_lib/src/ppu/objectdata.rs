@@ -1,5 +1,7 @@
 use core::mem::size_of;
 
+use super::palette::PaletteID;
+
 #[derive(Debug, Clone, Copy, Default)]
 #[repr(transparent)]
 pub struct ObjectData([u8; 4]);
@@ -10,7 +12,7 @@ impl ObjectData {
     }
 
     pub const fn offset_ypos(self) -> i16 {
-        ((self.y_pos() as u16) as i16) - 8
+        ((self.y_pos() as u16) as i16) - 16
     }
 
     pub const fn x_pos(self) -> u8 {
@@ -38,11 +40,30 @@ impl From<[u8; size_of::<ObjectData>()]> for ObjectData {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
-struct ObjDataFlags(u8);
+pub struct ObjDataFlags(u8);
 
 impl ObjDataFlags {
     pub const fn from_byte(val: u8) -> ObjDataFlags {
         Self(val)
+    }
+
+    pub const fn prio_always(self) -> bool {
+        self.0 & (1 << 7) == 0
+    }
+
+    pub const fn y_flip(self) -> bool {
+        self.0 & (1 << 6) != 0
+    }
+
+    pub const fn x_flip(self) -> bool {
+        self.0 & (1 << 5) != 0
+    }
+
+    pub const fn palette(self) -> PaletteID {
+        match self.0 & (1 << 4) != 0 {
+            true => PaletteID::One,
+            false => PaletteID::Zero,
+        }
     }
 }
 

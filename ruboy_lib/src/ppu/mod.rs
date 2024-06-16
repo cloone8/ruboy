@@ -8,7 +8,7 @@ use thiserror::Error;
 use crate::{
     extern_traits::{Frame, GBAllocator, GBGraphicsDrawer, RomReader, FRAME_X, FRAME_Y},
     memcontroller::{MemController, ReadError, OAM_START},
-    GbMonoColor,
+    GbColorID, GbMonoColor,
 };
 
 mod fetcher;
@@ -248,8 +248,8 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             let xpos_ok = obj_data.offset_xpos() > 0;
 
             let ly = mem.io_registers.lcd_y;
-            let ypos_ok = ((ly + 16) as i16) >= obj_data.offset_ypos()
-                && ((ly + 16) as i16) < obj_data.offset_ypos() + obj_height;
+            let ypos_ok = (ly as i16) >= obj_data.offset_ypos() // Top above current line
+                && (ly as i16) < obj_data.offset_ypos() + obj_height; // bottom below current line
 
             if xpos_ok && ypos_ok {
                 log::trace!("Adding object {} to buffer", data.cur_obj_index);
@@ -271,6 +271,27 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
 
         Ok(())
     }
+
+    fn get_obj_at_x(objs: &mut [ObjectData], x: u8) -> Option<ObjectData> {
+        let idx = objs.iter().position(|obj| x as i16 == obj.offset_xpos());
+
+        match idx {
+            Some(idx) => {
+                // Found an object! Remove it from the buffer
+                let found_obj = objs[idx];
+
+                // Shift all elements starting at the removed one left
+                for i in (idx + 1)..objs.len() {
+                    objs[i - 1] = objs[i];
+                }
+
+                // Callee should take care of actually shortening the buffer
+                Some(found_obj)
+            }
+            None => None,
+        }
+    }
+
     fn draw(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
@@ -280,21 +301,54 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             _ => panic!("Invalid mode for drawing!"),
         };
 
-        self.pix_fetcher
-            .run_cycle(mem, &data.buffer[..data.num_in_buf as usize], false)?;
+        self.pix_fetcher.run_cycle(mem, false)?;
+
+        // Find out if there's an object at the current x we need to fetch
+        if !self.pix_fetcher.is_fetching_obj() {
+            let found_obj = Self::get_obj_at_x(
+                &mut data.buffer[..data.num_in_buf as usize],
+                data.pushed_pixels,
+            );
+
+            if let Some(obj) = found_obj {
+                // [get_obj_at_x] should have already shifted the remaining objects
+                // to the left
+                data.num_in_buf -= 1;
+                self.pix_fetcher.fetch_obj(obj);
+            }
+        }
+
+        // _After_ we've initiated a fetch, we wait for fetching to be complete.
+        // We need to check this here, so that multiple overlapping objects
+        // correctly pause rendering
+        if self.pix_fetcher.is_fetching_obj() {
+            return Ok(());
+        }
 
         if self.pix_fetcher.get_bg_fifo().len() > 8 {
             if data.pix_to_discard > 0 {
                 _ = self.pix_fetcher.get_bg_fifo_mut().pop().unwrap();
                 data.pix_to_discard -= 1;
             } else {
+                let bg_palette = Palette::load_bg(mem);
                 let bg_pix = self.pix_fetcher.get_bg_fifo_mut().pop().unwrap();
+                let bg_color = bg_palette.make_color(bg_pix);
+                let obj_pix = self.pix_fetcher.get_obj_fifo_mut().pop();
 
-                self.framebuf.set_pix(
-                    data.pushed_pixels,
-                    mem.io_registers.lcd_y,
-                    Palette::load_bg(mem).make_color(bg_pix),
-                );
+                let color = if let Ok(obj_pix) = obj_pix {
+                    if (obj_pix.color == GbColorID::ID0)
+                        || (!obj_pix.prio_always && bg_pix != GbColorID::ID0)
+                    {
+                        bg_color
+                    } else {
+                        Palette::load_obj(obj_pix.palette_id, mem).make_color(obj_pix.color)
+                    }
+                } else {
+                    bg_color
+                };
+
+                self.framebuf
+                    .set_pix(data.pushed_pixels, mem.io_registers.lcd_y, color);
 
                 data.pushed_pixels += 1;
             }
