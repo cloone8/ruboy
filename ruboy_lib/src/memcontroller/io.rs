@@ -189,7 +189,7 @@ impl IoRegs {
     pub fn write(&mut self, addr: u16, val: u8) -> Result<(), IoWriteErr> {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
-            0xFF00 => self.joypad = val,
+            // 0xFF00 => self.joypad = val,
             0xFF40 => self.lcd_control = val.into(),
             0xFF41 => self.lcd_stat = val,
             0xFF42 => self.scy = val,
@@ -220,7 +220,7 @@ impl IoRegs {
     pub fn read(&self, addr: u16) -> Result<u8, IoReadErr> {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
-            0xFF00 => Ok(0xFF),
+            0xFF00 => Ok(0xF),
             0xFF40 => Ok(self.lcd_control.into()),
             0xFF41 => Ok(self.lcd_stat),
             0xFF42 => Ok(self.scy),

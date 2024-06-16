@@ -337,7 +337,7 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
 
                 let color = if let Ok(obj_pix) = obj_pix {
                     if (obj_pix.color == GbColorID::ID0)
-                        || (!obj_pix.prio_always && bg_pix != GbColorID::ID0)
+                        || (obj_pix.bg_win_prio && bg_pix != GbColorID::ID0)
                     {
                         bg_color
                     } else {
@@ -375,6 +375,7 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
 
             if mem.io_registers.lcd_y as usize == FRAME_Y {
                 self.mode = PpuMode::VBlank;
+                mem.io_registers.interrupts_requested.set_vblank(true);
             } else {
                 mem.oam_open = false;
                 self.mode = PpuMode::OAMScan(OAMScanData::new());

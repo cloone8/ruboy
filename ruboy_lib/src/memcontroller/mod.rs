@@ -39,7 +39,7 @@ pub struct MemController<A: GBAllocator, R: RomReader> {
     ram: A::Mem<u8, { WORKRAM_SIZE as usize }>,
     oam: A::Mem<u8, { OAM_SIZE as usize }>,
     hram: A::Mem<u8, { HRAM_SIZE as usize }>,
-    interrupts_enabled: Interrupts,
+    pub interrupts_enabled: Interrupts,
 
     /// If true, CPU can access VRAM
     pub vram_open: bool,

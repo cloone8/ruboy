@@ -47,8 +47,8 @@ impl ObjDataFlags {
         Self(val)
     }
 
-    pub const fn prio_always(self) -> bool {
-        self.0 & (1 << 7) == 0
+    pub const fn bg_win_prio(self) -> bool {
+        self.0 & (1 << 7) != 0
     }
 
     pub const fn y_flip(self) -> bool {

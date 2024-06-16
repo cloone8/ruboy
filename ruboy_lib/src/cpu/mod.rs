@@ -9,7 +9,9 @@ use registers::Registers;
 use crate::{
     extern_traits::{GBAllocator, RomReader},
     isa::*,
-    memcontroller::{MemController, MemControllerDecoderErr, ReadError, WriteError},
+    memcontroller::{
+        interrupts::Interrupts, MemController, MemControllerDecoderErr, ReadError, WriteError,
+    },
 };
 
 pub struct Cpu {
@@ -613,7 +615,47 @@ impl Cpu {
             self.registers.set_pc(self.registers.pc() + instr_len);
         }
 
-        // Calculate remaining cycles
+        // Handle any interrupts.
+        if self.interrupts_master {
+            let enabled = mem.interrupts_enabled;
+            let requested = mem.io_registers.interrupts_requested;
+            let to_service: Interrupts = (u8::from(enabled) & u8::from(requested)).into();
+
+            // We have an interrupt! Disable any following interrupts
+            // and go to the handler. We check for zero
+            // with the lower 5 bits, because the upper 3 are unused
+            // and thus do not actually correspond to an interrupt
+            if u8::from(to_service) & 0b00011111 != 0 {
+                log::debug!("Handling interrupt! 0b{:b}", u8::from(to_service));
+                self.interrupts_master = false;
+
+                let handler_addr: u16 = if to_service.vblank() {
+                    mem.io_registers.interrupts_requested.set_vblank(false);
+                    0x40
+                } else if to_service.lcd() {
+                    mem.io_registers.interrupts_requested.set_lcd(false);
+                    0x48
+                } else if to_service.timer() {
+                    mem.io_registers.interrupts_requested.set_timer(false);
+                    0x50
+                } else if to_service.serial() {
+                    mem.io_registers.interrupts_requested.set_serial(false);
+                    0x58
+                } else if to_service.joypad() {
+                    mem.io_registers.interrupts_requested.set_joypad(false);
+                    0x60
+                } else {
+                    unreachable!("Not actually an interrupt");
+                };
+
+                // Return addr is just the current PC now, since we were interrupted before executing it
+                self.do_call(mem, self.registers.pc(), handler_addr)?;
+                self.cycles_remaining = 20; // Entire interrupt routine takes 20 cycles to complete
+                return Ok(());
+            }
+        }
+
+        // No interrupt was handled. Just continue execution as usual
         match instr.cycles() {
             TCycles::Static(cycles) => self.cycles_remaining = cycles - 1,
             TCycles::Branching { taken, non_taken } => {

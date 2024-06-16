@@ -1,4 +1,5 @@
 #[derive(Debug, Clone, Copy, Default)]
+#[repr(transparent)]
 pub struct Interrupts {
     raw: u8,
 }
@@ -19,27 +20,27 @@ impl Interrupts {
     }
 
     #[inline]
-    pub fn vblank(self) -> bool {
+    pub const fn vblank(self) -> bool {
         self.get(0b1)
     }
 
     #[inline]
-    pub fn lcd(self) -> bool {
+    pub const fn lcd(self) -> bool {
         self.get(0b10)
     }
 
     #[inline]
-    pub fn timer(self) -> bool {
+    pub const fn timer(self) -> bool {
         self.get(0b100)
     }
 
     #[inline]
-    pub fn serial(self) -> bool {
+    pub const fn serial(self) -> bool {
         self.get(0b1000)
     }
 
     #[inline]
-    pub fn joypad(self) -> bool {
+    pub const fn joypad(self) -> bool {
         self.get(0b10000)
     }
 

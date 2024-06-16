@@ -46,7 +46,7 @@ enum Phase {
 pub struct FetchedPixel {
     pub color: GbColorID,
     pub palette_id: PaletteID,
-    pub prio_always: bool,
+    pub bg_win_prio: bool,
 }
 
 #[derive(Debug, Error)]
@@ -258,7 +258,7 @@ impl PixelFetcher {
                     .push(FetchedPixel {
                         color: pix,
                         palette_id: obj.flags().palette(),
-                        prio_always: obj.flags().prio_always(),
+                        bg_win_prio: obj.flags().bg_win_prio(),
                     })
                     .unwrap()
             });
