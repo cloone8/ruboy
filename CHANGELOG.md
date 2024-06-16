@@ -4,6 +4,12 @@ This file will document the most important changes for each released version.
 
 ## [v0.1.6]
 
+### All
+- Fixed CPU bugs
+- Implemented CPU timer registers
+- Fixed bug in boot ROM mapping
+- Implemented (buggy for now) version of object drawing
+
 ## [v0.1.5]
 
 ### All
