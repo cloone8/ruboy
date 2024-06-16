@@ -4,7 +4,7 @@ mod timer;
 
 use core::num::Wrapping;
 
-use nums::{GbBits, HalfCarry};
+use nums::{GbBits, GbHalfCarry};
 use thiserror::Error;
 
 use registers::Registers;
@@ -286,7 +286,19 @@ impl Cpu {
                 false
             }
             Instruction::AddCarry(_) => instr_todo!(instr),
-            Instruction::AddHL(_) => instr_todo!(instr),
+            Instruction::AddHL(reg) => {
+                let base = self.registers.hl();
+                let val = self.get_reg16_value(reg);
+
+                let (res, carry) = base.overflowing_add(val);
+
+                self.registers
+                    .set_flags(res == 0, false, base.halfcarry_add(val), carry);
+
+                self.registers.set_hl(res);
+
+                false
+            }
             Instruction::AddSP(_) => instr_todo!(instr),
             Instruction::Sub(src) => {
                 let base = self.registers.a();
@@ -431,7 +443,17 @@ impl Cpu {
                 false
             }
             Instruction::RotRight(_) => instr_todo!(instr),
-            Instruction::ShiftLeftArith(_) => instr_todo!(instr),
+            Instruction::ShiftLeftArith(tgt) => {
+                let init_val = self.get_prefarith_tgt(mem, tgt)?;
+                let shifted = init_val.wrapping_shl(1);
+
+                self.registers
+                    .set_flags(shifted == 0, false, false, init_val.msb_set());
+
+                self.set_prefarith_tgt(mem, tgt, shifted)?;
+
+                false
+            }
             Instruction::ShiftRightArith(_) => instr_todo!(instr),
             Instruction::Swap(tgt) => {
                 let val = self.get_prefarith_tgt(mem, tgt)?;
@@ -448,10 +470,7 @@ impl Cpu {
             }
             Instruction::ShiftRightLogic(_) => instr_todo!(instr),
             Instruction::Bit(bit, tgt) => {
-                let val = match tgt {
-                    PrefArithTarget::Reg(reg) => self.get_reg8_value(reg),
-                    PrefArithTarget::MemHL => instr_todo!(instr),
-                };
+                let val = self.get_prefarith_tgt(mem, tgt)?;
 
                 let is_zero = val & (1 << (bit as usize)) == 0;
 
@@ -461,7 +480,15 @@ impl Cpu {
 
                 false
             }
-            Instruction::Res(_, _) => instr_todo!(instr),
+            Instruction::Res(bit, tgt) => {
+                let val = self.get_prefarith_tgt(mem, tgt)?;
+
+                let bit: u8 = 0b1 << bit as usize;
+
+                self.set_prefarith_tgt(mem, tgt, val & (!bit))?;
+
+                false
+            }
             Instruction::Set(_, _) => instr_todo!(instr),
             Instruction::Load8(dst, src) => {
                 let val = match src {
@@ -537,8 +564,18 @@ impl Cpu {
                 self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset);
                 true
             }
-            Instruction::JumpHL => instr_todo!(instr),
-            Instruction::JumpIf(_, _) => instr_todo!(instr),
+            Instruction::JumpHL => {
+                self.registers.set_pc(self.registers.hl());
+                true
+            }
+            Instruction::JumpIf(addr, cond) => {
+                if self.check_condition(cond) {
+                    self.registers.set_pc(addr);
+                    true
+                } else {
+                    false
+                }
+            }
             Instruction::JumpRelIf(offset, condition) => {
                 if self.check_condition(condition) {
                     self.do_rel_jump(self.registers.pc() + (instr.len() as u16), offset);
@@ -573,8 +610,25 @@ impl Cpu {
 
                 true
             }
-            Instruction::Reti => instr_todo!(instr),
-            Instruction::RetIf(_) => instr_todo!(instr),
+            Instruction::Reti => {
+                // TODO: Not entirely sure if the order and timings
+                // of enabling/disabling interrupts is correct.
+                let ret_addr = self.do_pop16(mem)?;
+                self.registers.set_pc(ret_addr);
+                self.interrupts_master = true; // This is definitely not correct
+
+                true
+            }
+            Instruction::RetIf(cond) => {
+                if self.check_condition(cond) {
+                    let ret_addr = self.do_pop16(mem)?;
+                    self.registers.set_pc(ret_addr);
+
+                    true
+                } else {
+                    false
+                }
+            }
             Instruction::Pop(reg) => {
                 let val = self.do_pop16(mem)?;
                 self.set_reg16_value(reg, val);
