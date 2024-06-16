@@ -1,3 +1,5 @@
+use core::num::Wrapping;
+
 use thiserror::Error;
 
 use crate::ppu::palette::Palette;
@@ -120,6 +122,18 @@ pub struct IoRegs {
     /// 0xFF00
     pub joypad: u8,
 
+    /// 0xFF04
+    pub timer_div: Wrapping<u8>,
+
+    /// 0xFF05
+    pub timer_counter: u8,
+
+    /// 0xFF06
+    pub timer_modulo: u8,
+
+    /// 0xFF07
+    pub timer_control: u8,
+
     /// 0xFF0F
     pub interrupts_requested: Interrupts,
 
@@ -170,6 +184,10 @@ impl IoRegs {
     pub fn new() -> Self {
         Self {
             joypad: 0,
+            timer_div: Wrapping(0),
+            timer_counter: 0,
+            timer_modulo: 0,
+            timer_control: 0,
             interrupts_requested: Interrupts::default(),
             lcd_control: LcdControl::default(),
             lcd_stat: 0,
@@ -190,6 +208,10 @@ impl IoRegs {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
             // 0xFF00 => self.joypad = val,
+            0xFF04 => self.timer_div.0 = 0, // Writing to div register always resets it
+            0xFF05 => self.timer_counter = val,
+            0xFF06 => self.timer_modulo = val,
+            0xFF07 => self.timer_control = val,
             0xFF40 => self.lcd_control = val.into(),
             0xFF41 => self.lcd_stat = val,
             0xFF42 => self.scy = val,
@@ -220,7 +242,11 @@ impl IoRegs {
     pub fn read(&self, addr: u16) -> Result<u8, IoReadErr> {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
-            0xFF00 => Ok(0xF),
+            0xFF00 => Ok(0xF), // Temp debug value for joypad
+            0xFF04 => Ok(self.timer_div.0),
+            0xFF05 => Ok(self.timer_counter),
+            0xFF06 => Ok(self.timer_modulo),
+            0xFF07 => Ok(self.timer_control),
             0xFF40 => Ok(self.lcd_control.into()),
             0xFF41 => Ok(self.lcd_stat),
             0xFF42 => Ok(self.scy),

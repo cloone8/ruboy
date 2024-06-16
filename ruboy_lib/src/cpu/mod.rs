@@ -1,5 +1,8 @@
 mod nums;
 mod registers;
+mod timer;
+
+use core::num::Wrapping;
 
 use nums::{GbBits, HalfCarry};
 use thiserror::Error;
@@ -15,6 +18,7 @@ use crate::{
 };
 
 pub struct Cpu {
+    timer_cycles: Wrapping<usize>,
     cycles_remaining: u8,
     interrupts_master: bool,
     /// Whether the interrupts master flag should be re-enabled after the next instruction
@@ -47,6 +51,7 @@ macro_rules! instr_todo {
 impl Cpu {
     pub fn new() -> Self {
         Cpu {
+            timer_cycles: Wrapping(0),
             cycles_remaining: 0,
             interrupts_master: false,
             ei_queued: false,
@@ -216,10 +221,33 @@ impl Cpu {
         }
     }
 
+    fn handle_timers(&mut self, mem: &mut MemController<impl GBAllocator, impl RomReader>) {
+        if self.timer_cycles.0 % 256 == 0 {
+            mem.io_registers.timer_div += 1;
+        }
+
+        if let Some(tac_frequency) = timer::get_tac_modulo(mem.io_registers.timer_control) {
+            if self.timer_cycles.0 % tac_frequency == 0 {
+                let (incremented, overflown) = mem.io_registers.timer_counter.overflowing_add(1);
+
+                if overflown {
+                    mem.io_registers.timer_counter = mem.io_registers.timer_modulo;
+                    mem.io_registers.interrupts_requested.set_timer(true);
+                } else {
+                    mem.io_registers.timer_counter = incremented;
+                }
+            }
+        }
+
+        self.timer_cycles += 1;
+    }
+
     pub fn run_cycle(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
     ) -> Result<(), CpuErr> {
+        self.handle_timers(mem);
+
         if self.cycles_remaining != 0 {
             // Still executing, continue later
             self.cycles_remaining -= 1;
@@ -626,7 +654,7 @@ impl Cpu {
             // with the lower 5 bits, because the upper 3 are unused
             // and thus do not actually correspond to an interrupt
             if u8::from(to_service) & 0b00011111 != 0 {
-                log::debug!("Handling interrupt! 0b{:b}", u8::from(to_service));
+                log::warn!("Handling interrupt! 0b{:b}", u8::from(to_service));
                 self.interrupts_master = false;
 
                 let handler_addr: u16 = if to_service.vblank() {
