@@ -228,7 +228,7 @@ impl Cpu {
 
         log::trace!("Running 0x{:x}: {}", self.registers.pc(), instr);
 
-        let enable_interrupts = self.ei_queued;
+        let should_enable_interrupts = self.ei_queued;
 
         let jumped = match instr {
             Instruction::Nop => false,
@@ -601,7 +601,7 @@ impl Cpu {
             }
         };
 
-        if enable_interrupts {
+        if should_enable_interrupts {
             self.ei_queued = false;
             self.interrupts_master = true;
         }
