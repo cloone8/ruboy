@@ -39,6 +39,12 @@ impl<T, const N: usize> InlineQueue<T, N> {
         }
     }
 
+    pub fn clear(&mut self) {
+        for _ in 0..self.len() {
+            _ = self.pop().unwrap();
+        }
+    }
+
     pub const fn len(&self) -> usize {
         self.cur_elements
     }
@@ -183,5 +189,25 @@ mod tests {
         (0..rest.len()).for_each(|i| {
             assert_eq!(i + 1, rest[i] as usize);
         });
+    }
+
+    #[test]
+    fn space_remaining_ok() {
+        let mut x = InlineQueue::<u8, 16>::new();
+
+        assert_eq!(16, x.space_remaining());
+
+        x.push(1).unwrap();
+
+        assert_eq!(15, x.space_remaining());
+
+        x.push_n([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+            .unwrap();
+
+        assert_eq!(1, x.space_remaining());
+
+        x.push(16).unwrap();
+
+        assert_eq!(0, x.space_remaining());
     }
 }

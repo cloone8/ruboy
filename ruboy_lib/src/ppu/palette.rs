@@ -1,4 +1,10 @@
-use crate::{GbColorID, GbMonoColor};
+use crate::{memcontroller::MemController, GBAllocator, GbColorID, GbMonoColor, RomReader};
+
+#[derive(Debug, Clone, Copy)]
+pub enum PaletteID {
+    Zero,
+    One,
+}
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -11,12 +17,26 @@ impl Palette {
         Self::default()
     }
 
-    pub const fn get_id(self, id: GbColorID) -> GbMonoColor {
+    pub const fn make_color(self, id: GbColorID) -> GbMonoColor {
         match id {
             GbColorID::ID0 => bits_to_color(self.val & 0b11),
             GbColorID::ID1 => bits_to_color((self.val & 0b1100) >> 2),
             GbColorID::ID2 => bits_to_color((self.val & 0b110000) >> 4),
             GbColorID::ID3 => bits_to_color((self.val & 0b11000000) >> 6),
+        }
+    }
+
+    pub fn load_bg(mem: &MemController<impl GBAllocator, impl RomReader>) -> Palette {
+        mem.io_registers.bg_palette
+    }
+
+    pub fn load_obj(
+        id: PaletteID,
+        mem: &MemController<impl GBAllocator, impl RomReader>,
+    ) -> Palette {
+        match id {
+            PaletteID::Zero => mem.io_registers.obj0_palette,
+            PaletteID::One => mem.io_registers.obj1_palette,
         }
     }
 }

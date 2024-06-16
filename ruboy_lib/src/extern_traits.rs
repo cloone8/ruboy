@@ -180,20 +180,6 @@ pub enum GbMonoColor {
     Black = 3,
 }
 
-impl GbMonoColor {
-    pub const fn from_id(id: GbColorID, palette: Option<Palette>) -> Self {
-        match palette {
-            Some(_) => todo!(),
-            None => match id {
-                GbColorID::ID0 => Self::White,
-                GbColorID::ID1 => Self::LightGray,
-                GbColorID::ID2 => Self::DarkGray,
-                GbColorID::ID3 => Self::Black,
-            },
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GbColorID {
     ID0,

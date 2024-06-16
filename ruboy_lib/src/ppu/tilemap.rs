@@ -23,7 +23,7 @@ mod tests {
     use std::mem::size_of;
 
     #[test]
-    fn background_map_size() {
-        assert_eq!(32 * 32, size_of::<TileMap>());
+    fn tilemap_size() {
+        assert_eq!(TILEMAP_X_SIZE * TILEMAP_Y_SIZE, size_of::<TileMap>());
     }
 }

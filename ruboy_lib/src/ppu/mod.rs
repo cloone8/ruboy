@@ -2,11 +2,11 @@ use core::mem::size_of;
 
 use fetcher::{FetcherErr, PixelFetcher};
 use objectdata::ObjectData;
+use palette::Palette;
 use thiserror::Error;
-use tile::Tile;
 
 use crate::{
-    extern_traits::{self, Frame, GBAllocator, GBGraphicsDrawer, RomReader, FRAME_X, FRAME_Y},
+    extern_traits::{Frame, GBAllocator, GBGraphicsDrawer, RomReader, FRAME_X, FRAME_Y},
     memcontroller::{MemController, ReadError, OAM_START},
     GbMonoColor,
 };
@@ -18,7 +18,9 @@ pub mod palette;
 mod tile;
 mod tilemap;
 
-const CYCLES_PER_LINE: usize = 456;
+const OAM_CYCLES: usize = 80;
+const SCANLINE_CYCLES: usize = 456;
+const FRAME_CYCLES: usize = SCANLINE_CYCLES * (FRAME_Y + 8);
 
 #[derive(Debug, Clone)]
 enum PpuMode {
@@ -59,42 +61,24 @@ impl OAMScanData {
 
 #[derive(Debug, Clone)]
 struct DrawData {
-    cur_x: u8,
+    pix_to_discard: u8,
+    pushed_pixels: u8,
     fetcher_cycles_left: u8,
     num_in_buf: u8,
     buffer: [ObjectData; 10],
 }
 
 impl DrawData {
-    pub fn new(obj_buffer: [ObjectData; 10], num_in_buf: u8) -> Self {
+    pub fn new(obj_buffer: [ObjectData; 10], num_in_buf: u8, to_discard: u8) -> Self {
+        log::trace!("Starting line draw, discarding {} pixels", to_discard);
         Self {
-            cur_x: 0,
+            pix_to_discard: to_discard,
+            pushed_pixels: 0,
             fetcher_cycles_left: 0,
             buffer: obj_buffer,
             num_in_buf,
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum FetcherState {
-    FetchTileNumber,
-    FetchTileDataLo,
-    FetchTileDataHi,
-    Sleep,
-    PushFifo,
-}
-
-impl FetcherState {
-    pub fn new() -> Self {
-        FetcherState::FetchTileNumber
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum PaletteID {
-    Zero,
-    One,
 }
 
 const NUM_OAM_OBJECTS: u8 = 40;
@@ -230,15 +214,20 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         }
 
         if data.cur_obj_index >= NUM_OAM_OBJECTS {
+            debug_assert_eq!(OAM_CYCLES + 1, self.line_data.cur_cycle);
             // Operation complete. If no more objects need to be scanned, go to next
             // phase
-            log::debug!(
+            log::trace!(
                 "OAM scan done, entering Draw mode. Found {} objects",
                 data.num_in_buf
             );
 
             mem.vram_open = false;
-            self.mode = PpuMode::Draw(DrawData::new(data.buffer, data.num_in_buf));
+            self.mode = PpuMode::Draw(DrawData::new(
+                data.buffer,
+                data.num_in_buf,
+                mem.io_registers.scx % 8,
+            ));
             return Ok(());
         }
 
@@ -291,21 +280,27 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             _ => panic!("Invalid mode for drawing!"),
         };
 
-        self.pix_fetcher.run_cycle(mem, &data.buffer, false)?;
+        self.pix_fetcher
+            .run_cycle(mem, &data.buffer[..data.num_in_buf as usize], false)?;
 
-        if !self.pix_fetcher.get_bg_fifo().empty() {
-            let bg_pix = self.pix_fetcher.get_bg_fifo_mut().pop().unwrap();
+        if self.pix_fetcher.get_bg_fifo().len() > 8 {
+            if data.pix_to_discard > 0 {
+                _ = self.pix_fetcher.get_bg_fifo_mut().pop().unwrap();
+                data.pix_to_discard -= 1;
+            } else {
+                let bg_pix = self.pix_fetcher.get_bg_fifo_mut().pop().unwrap();
 
-            self.framebuf.set_pix(
-                data.cur_x,
-                mem.io_registers.lcd_y,
-                GbMonoColor::from_id(bg_pix, None),
-            );
+                self.framebuf.set_pix(
+                    data.pushed_pixels,
+                    mem.io_registers.lcd_y,
+                    Palette::load_bg(mem).make_color(bg_pix),
+                );
 
-            data.cur_x += 1;
+                data.pushed_pixels += 1;
+            }
         }
 
-        if data.cur_x as usize == FRAME_X {
+        if data.pushed_pixels as usize == FRAME_X {
             mem.vram_open = true;
             mem.oam_open = true;
             self.mode = PpuMode::HBlank;
@@ -318,7 +313,7 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
     ) -> Result<(), HBlankErr> {
-        if self.line_data.cur_cycle == CYCLES_PER_LINE {
+        if self.line_data.cur_cycle == SCANLINE_CYCLES {
             self.line_data = LineData::new();
             mem.io_registers.lcd_y += 1;
 
@@ -339,11 +334,11 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
     ) -> Result<(), VBlankErr<V>> {
-        if self.line_data.cur_cycle == CYCLES_PER_LINE {
+        if self.line_data.cur_cycle == SCANLINE_CYCLES {
             self.line_data = LineData::new();
             mem.io_registers.lcd_y += 1;
 
-            if mem.io_registers.lcd_y as usize == FRAME_Y + 9 {
+            if mem.io_registers.lcd_y as usize == (FRAME_Y + 10) {
                 mem.io_registers.lcd_y = 0;
 
                 self.output
@@ -381,7 +376,7 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             PpuMode::Draw(_) => self.draw(mem)?,
         }
 
-        debug_assert!((mem.io_registers.lcd_y as usize) < FRAME_Y + 9);
+        debug_assert!((mem.io_registers.lcd_y as usize) < (FRAME_Y + 10));
 
         if mem.io_registers.lcd_y as usize >= FRAME_Y {
             debug_assert!(matches!(self.mode, PpuMode::VBlank));

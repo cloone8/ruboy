@@ -88,7 +88,6 @@ macro_rules! cmp_reg {
 }
 const fn decode_prefixed(instr: u8) -> Instruction {
     match instr {
-        //TODO: Jesus Christ, proc macro time.
         0x00 => Instruction::RotLeftCircular(PrefArithTarget::Reg(Reg8::B)),
         0x01 => Instruction::RotLeftCircular(PrefArithTarget::Reg(Reg8::C)),
         0x02 => Instruction::RotLeftCircular(PrefArithTarget::Reg(Reg8::D)),

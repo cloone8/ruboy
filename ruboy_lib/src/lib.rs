@@ -146,7 +146,7 @@ impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Ruboy<A, R, V> {
                     cycles_since_last_report as f64 / last_report_elapsed.as_secs_f64(),
                 );
 
-                log::info!("Current speed: {}", cycles_per_second);
+                log::debug!("Current speed: {}", cycles_per_second);
                 cycles_since_last_report = 0;
                 last_report = Instant::now();
             }

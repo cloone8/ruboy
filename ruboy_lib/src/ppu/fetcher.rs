@@ -8,7 +8,7 @@ use crate::{
     GBAllocator, GbColorID, GbMonoColor, RomReader,
 };
 
-use super::{inlinequeue::InlineQueue, objectdata::ObjectData, tile::Tile, PaletteID};
+use super::{inlinequeue::InlineQueue, objectdata::ObjectData, palette::PaletteID, tile::Tile};
 
 #[derive(Debug)]
 pub struct PixelFetcher {
@@ -46,12 +46,6 @@ pub struct FetchedPixel {
     color: GbColorID,
     palette: PaletteID,
     priority: bool,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum FetchedPixels {
-    Background([FetchedPixel; 8]),
-    Object([FetchedPixel; 8]),
 }
 
 #[derive(Debug, Error)]
@@ -96,10 +90,13 @@ impl PixelFetcher {
 
     pub fn vblank_reset(&mut self) {
         self.window_lines_drawn = 0;
+        self.hblank_reset();
     }
 
     pub fn hblank_reset(&mut self) {
         self.x_pos = 0;
+        self.bg_fifo.clear();
+        self.obj_fifo.clear();
     }
 
     fn fetch_tile(

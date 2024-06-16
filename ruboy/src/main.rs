@@ -1,3 +1,4 @@
+use core::time::Duration;
 use std::array;
 use std::fmt::Display;
 use std::io::BufReader;
@@ -5,6 +6,7 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
+use std::time::Instant;
 use std::{error::Error, fs::File};
 
 use anyhow::{Context, Result};
@@ -26,6 +28,8 @@ struct VideoOutput {
     frame_dirty: Arc<AtomicBool>,
     framebuf: Arc<Mutex<FrameData>>,
     ui_ctx: egui::Context,
+    num_frames: usize,
+    last_frametime_check: Option<Instant>,
 }
 
 impl VideoOutput {
@@ -38,6 +42,29 @@ impl VideoOutput {
             frame_dirty: dirty_flag,
             framebuf,
             ui_ctx,
+            num_frames: 0,
+            last_frametime_check: None,
+        }
+    }
+
+    fn check_frametime(&mut self) {
+        if self.last_frametime_check.is_none() {
+            self.last_frametime_check = Some(Instant::now());
+            return;
+        }
+
+        let last_check_time = self.last_frametime_check.unwrap();
+
+        let now = Instant::now();
+        let duration_since = now.duration_since(last_check_time);
+        if duration_since > Duration::from_millis(100) {
+            log::debug!(
+                "FPS: {}",
+                self.num_frames as f64 / duration_since.as_secs_f64()
+            );
+
+            self.num_frames = 0;
+            self.last_frametime_check = Some(now);
         }
     }
 }
@@ -83,9 +110,14 @@ impl GBGraphicsDrawer for VideoOutput {
             *pix = converted_frame[i];
         }
 
+        std::mem::drop(locked_framebuf);
+
         self.frame_dirty.store(true, Ordering::Relaxed);
 
         self.ui_ctx.request_repaint();
+
+        self.num_frames += 1;
+        self.check_frametime();
 
         Ok(())
     }
