@@ -15,6 +15,7 @@ pub struct PixelFetcher {
     cycles_left: u8,
     bg_win_x_pos: u8,
     window_lines_drawn: u8,
+    first_tile_fetched: bool,
     win_x_reached: bool,
     object_to_fetch: Option<ObjectData>,
     bg_fifo: InlineQueue<GbColorID, 16>,
@@ -81,6 +82,7 @@ impl PixelFetcher {
         Self {
             cycles_left: 0,
             bg_win_x_pos: 0,
+            first_tile_fetched: false,
             win_x_reached: false,
             window_lines_drawn: 0,
             object_to_fetch: None,
@@ -107,6 +109,7 @@ impl PixelFetcher {
 
     pub fn hblank_reset(&mut self) {
         self.bg_win_x_pos = 0;
+        self.first_tile_fetched = false;
         self.bg_fifo.clear();
         self.obj_fifo.clear();
     }
@@ -264,9 +267,17 @@ impl PixelFetcher {
                     })
                     .unwrap()
             });
+
+            debug_assert!(!self.is_fetching_obj());
         } else {
             self.bg_fifo.push_n(pixels).unwrap();
-            self.bg_win_x_pos += 1;
+            // The first tile on each scanline is fetched
+            // twice, to make sure the bg fifo starts out filled
+            if self.first_tile_fetched {
+                self.bg_win_x_pos += 1;
+            } else {
+                self.first_tile_fetched = true;
+            }
         }
 
         self.phase = Phase::FetchTile;

@@ -63,7 +63,6 @@ impl OAMScanData {
 struct DrawData {
     pix_to_discard: u8,
     pushed_pixels: u8,
-    fetcher_cycles_left: u8,
     num_in_buf: u8,
     buffer: [ObjectData; 10],
 }
@@ -74,7 +73,6 @@ impl DrawData {
         Self {
             pix_to_discard: to_discard,
             pushed_pixels: 0,
-            fetcher_cycles_left: 0,
             buffer: obj_buffer,
             num_in_buf,
         }
@@ -226,7 +224,7 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
             self.mode = PpuMode::Draw(DrawData::new(
                 data.buffer,
                 data.num_in_buf,
-                mem.io_registers.scx % 8,
+                (mem.io_registers.scx % 8) + 8,
             ));
             return Ok(());
         }
@@ -245,13 +243,11 @@ impl<V: GBGraphicsDrawer> Ppu<V> {
                 8
             };
 
-            let xpos_ok = obj_data.offset_xpos() > 0;
-
             let ly = mem.io_registers.lcd_y;
             let ypos_ok = (ly as i16) >= obj_data.offset_ypos() // Top above current line
                 && (ly as i16) < obj_data.offset_ypos() + obj_height; // bottom below current line
 
-            if xpos_ok && ypos_ok {
+            if ypos_ok {
                 log::trace!("Adding object {} to buffer", data.cur_obj_index);
 
                 data.buffer[data.num_in_buf as usize] = obj_data;
