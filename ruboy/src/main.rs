@@ -359,7 +359,7 @@ fn main() -> Result<()> {
     eframe::run_native(
         "Ruboy",
         options,
-        Box::new(|_| Box::new(RuboyApp::new(args))),
+        Box::new(|_| Ok(Box::new(RuboyApp::new(args)))),
     )
     .expect("Could not initialize window");
 
