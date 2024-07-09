@@ -207,7 +207,7 @@ impl IoRegs {
     pub fn write(&mut self, addr: u16, val: u8) -> Result<(), IoWriteErr> {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
-            // 0xFF00 => self.joypad = val,
+            0xFF00 => self.joypad = (self.joypad & 0x0F) | (val & 0xF0),
             0xFF04 => self.timer_div.0 = 0, // Writing to div register always resets it
             0xFF05 => self.timer_counter = val,
             0xFF06 => self.timer_modulo = val,
@@ -242,7 +242,7 @@ impl IoRegs {
     pub fn read(&self, addr: u16) -> Result<u8, IoReadErr> {
         match addr {
             ..=0xFEFF => panic!("Too low for I/O range"),
-            0xFF00 => Ok(0xF), // Temp debug value for joypad
+            0xFF00 => Ok(self.joypad),
             0xFF04 => Ok(self.timer_div.0),
             0xFF05 => Ok(self.timer_counter),
             0xFF06 => Ok(self.timer_modulo),

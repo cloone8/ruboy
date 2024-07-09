@@ -1,8 +1,10 @@
+use core::default;
 use core::time::Duration;
 use std::array;
 use std::fmt::Display;
 use std::io::BufReader;
 use std::ops::Deref;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -15,13 +17,51 @@ use eframe::egui::{
     self, load::SizedTexture, CentralPanel, Color32, ColorImage, Image, TextureHandle,
     TextureOptions,
 };
+use eframe::egui::{InputState, Key};
 use eframe::NativeOptions;
-use ruboy_lib::{Frame, GBGraphicsDrawer, GbMonoColor, InlineAllocator, Ruboy, FRAME_X, FRAME_Y};
+use ruboy_lib::{
+    Frame, GBGraphicsDrawer, GbInputs, GbMonoColor, InlineAllocator, InputHandler, Ruboy, FRAME_X,
+    FRAME_Y,
+};
 use std::sync::Mutex;
 
 use crate::args::CLIArgs;
 
 mod args;
+
+#[derive(Debug, Default)]
+struct Inputs {
+    up: AtomicBool,
+    down: AtomicBool,
+    left: AtomicBool,
+    right: AtomicBool,
+    start: AtomicBool,
+    select: AtomicBool,
+    a: AtomicBool,
+    b: AtomicBool,
+}
+
+#[derive(Debug, Clone)]
+struct KeyboardInput {
+    inputs: Arc<Inputs>,
+}
+
+impl InputHandler for KeyboardInput {
+    fn get_new_inputs(&mut self) -> ruboy_lib::GbInputs {
+        let inputs = self.inputs.as_ref();
+
+        GbInputs {
+            up: inputs.up.load(Ordering::Relaxed),
+            down: inputs.down.load(Ordering::Relaxed),
+            left: inputs.left.load(Ordering::Relaxed),
+            right: inputs.right.load(Ordering::Relaxed),
+            start: inputs.start.load(Ordering::Relaxed),
+            select: inputs.select.load(Ordering::Relaxed),
+            b: inputs.b.load(Ordering::Relaxed),
+            a: inputs.a.load(Ordering::Relaxed),
+        }
+    }
+}
 
 #[derive(Debug)]
 struct VideoOutput {
@@ -179,6 +219,7 @@ struct RuboyApp {
     frame_dirty: Arc<AtomicBool>,
     framebuf: Arc<Mutex<FrameData>>,
     frametex: Option<TextureHandle>,
+    input_handler: Arc<Inputs>,
 }
 
 impl RuboyApp {
@@ -190,6 +231,7 @@ impl RuboyApp {
             framebuf: Arc::new(Mutex::new(FrameData::default())),
             frame_dirty: Arc::new(AtomicBool::new(false)),
             frametex: None,
+            input_handler: Arc::new(Inputs::default()),
         }
     }
 
@@ -208,6 +250,7 @@ impl RuboyApp {
         let cloned_framebuf = self.framebuf.clone();
         let cloned_dirty_flag = self.frame_dirty.clone();
         let cloned_context = ctx.clone();
+        let cloned_inputs = self.input_handler.clone();
 
         let thread = thread::Builder::new()
             .name("emulator".to_owned())
@@ -215,6 +258,7 @@ impl RuboyApp {
                 emulator_thread(
                     cloned_context,
                     thread_args,
+                    cloned_inputs,
                     cloned_framebuf,
                     cloned_dirty_flag,
                 )
@@ -293,6 +337,37 @@ impl RuboyApp {
             None => false,
         }
     }
+
+    fn update_keyboard_input(&mut self, ctx: &egui::Context) {
+        ctx.input(|input| {
+            let keys_down = &input.keys_down;
+
+            self.input_handler
+                .left
+                .store(keys_down.contains(&Key::ArrowLeft), Ordering::Relaxed);
+            self.input_handler
+                .right
+                .store(keys_down.contains(&Key::ArrowRight), Ordering::Relaxed);
+            self.input_handler
+                .up
+                .store(keys_down.contains(&Key::ArrowUp), Ordering::Relaxed);
+            self.input_handler
+                .down
+                .store(keys_down.contains(&Key::ArrowDown), Ordering::Relaxed);
+            self.input_handler
+                .a
+                .store(keys_down.contains(&Key::A), Ordering::Relaxed);
+            self.input_handler
+                .b
+                .store(keys_down.contains(&Key::B), Ordering::Relaxed);
+            self.input_handler
+                .start
+                .store(keys_down.contains(&Key::Enter), Ordering::Relaxed);
+            self.input_handler
+                .select
+                .store(keys_down.contains(&Key::Backspace), Ordering::Relaxed);
+        });
+    }
 }
 
 impl eframe::App for RuboyApp {
@@ -303,6 +378,7 @@ impl eframe::App for RuboyApp {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
         }
 
+        self.update_keyboard_input(ctx);
         self.update_texture_from_framedata();
         self.show_gameboy_frame(ctx);
     }
@@ -311,6 +387,7 @@ impl eframe::App for RuboyApp {
 fn emulator_thread(
     ctx: egui::Context,
     args: CLIArgs,
+    inputs: Arc<Inputs>,
     framebuf: Arc<Mutex<FrameData>>,
     dirty_flag: Arc<AtomicBool>,
 ) {
@@ -322,7 +399,9 @@ fn emulator_thread(
 
     let video = VideoOutput::new(dirty_flag, framebuf, ctx);
 
-    let ruboy = Ruboy::<InlineAllocator, _, _>::new(reader, video)
+    let input = KeyboardInput { inputs };
+
+    let ruboy = Ruboy::<InlineAllocator, _, _, _>::new(reader, video, input)
         .context("Could not initialize Ruboy")
         .unwrap();
 

@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use cpu::Cpu;
 use cpu::CpuErr;
+use input::apply_input_to;
 use memcontroller::MemController;
 
 use memcontroller::MemControllerInitErr;
@@ -14,6 +15,7 @@ use thiserror::Error;
 mod boot;
 mod cpu;
 mod extern_traits;
+mod input;
 pub mod isa;
 mod memcontroller;
 mod ppu;
@@ -29,15 +31,17 @@ const CYCLES_PER_INTERVAL: u64 = (TARGET_CLOCK_SPEED_HZ * SPEED_CHECK_INTERVAL_M
 const SPEED_REPORT_INTERVAL_MS: u64 = 1000;
 const SPEED_REPORT_INTERVAL_DURATION: Duration = Duration::from_millis(SPEED_REPORT_INTERVAL_MS);
 
-pub struct Ruboy<A, R, V>
+pub struct Ruboy<A, R, V, I>
 where
     A: GBAllocator,
     R: RomReader,
     V: GBGraphicsDrawer,
+    I: InputHandler,
 {
     cpu: Cpu,
     ppu: Ppu<V>,
     mem: MemController<A, R>,
+    input: I,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -114,12 +118,13 @@ pub enum RuboyErr<V: GBGraphicsDrawer> {
 // impl<V: GBGraphicsDrawer> std::error::Error for RuboyErr<V> {}
 // impl<V: GBGraphicsDrawer> Display for RuboyErr<V> {}
 
-impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Ruboy<A, R, V> {
-    pub fn new(rom: R, output: V) -> Result<Self, RuboyStartErr<R>> {
+impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer, I: InputHandler> Ruboy<A, R, V, I> {
+    pub fn new(rom: R, output: V, input: I) -> Result<Self, RuboyStartErr<R>> {
         Ok(Self {
             cpu: Cpu::new(),
             ppu: Ppu::new(output),
             mem: MemController::new(rom)?,
+            input,
         })
     }
 
@@ -133,6 +138,14 @@ impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer> Ruboy<A, R, V> {
         let mut last_report = Instant::now();
 
         loop {
+            let (new_joypad_reg_value, can_raise_joypad_interrupt) =
+                apply_input_to(self.mem.io_registers.joypad, self.input.get_new_inputs());
+
+            self.mem.io_registers.joypad = new_joypad_reg_value;
+            if can_raise_joypad_interrupt {
+                self.mem.io_registers.interrupts_requested.set_joypad(true);
+            }
+
             self.cpu.run_cycle(&mut self.mem)?;
             self.ppu.run_cycle(&mut self.mem)?;
 

@@ -252,3 +252,19 @@ pub trait GBGraphicsDrawer: Debug {
     type Err: Error + 'static;
     fn output(&mut self, frame: &Frame) -> Result<(), Self::Err>;
 }
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct GbInputs {
+    pub start: bool,
+    pub select: bool,
+    pub b: bool,
+    pub a: bool,
+    pub down: bool,
+    pub up: bool,
+    pub left: bool,
+    pub right: bool,
+}
+
+pub trait InputHandler {
+    fn get_new_inputs(&mut self) -> GbInputs;
+}
