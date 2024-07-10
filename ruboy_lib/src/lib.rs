@@ -8,6 +8,7 @@ use input::apply_input_to;
 use memcontroller::MemController;
 
 use memcontroller::MemControllerInitErr;
+use memcontroller::WriteError;
 use ppu::Ppu;
 use ppu::PpuErr;
 use thiserror::Error;
@@ -113,6 +114,9 @@ pub enum RuboyErr<V: GBGraphicsDrawer> {
 
     #[error("Error during PPU cycle")]
     Ppu(#[from] PpuErr<V>),
+
+    #[error("Error during DMA cycle")]
+    Dma(#[source] WriteError),
 }
 
 // impl<V: GBGraphicsDrawer> std::error::Error for RuboyErr<V> {}
@@ -148,6 +152,7 @@ impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer, I: InputHandler> Ruboy<A
 
             self.cpu.run_cycle(&mut self.mem)?;
             self.ppu.run_cycle(&mut self.mem)?;
+            self.mem.dma_cycle().map_err(|e| RuboyErr::Dma(e))?;
 
             cycles_since_last_check += 1;
             cycles_since_last_report += 1;

@@ -285,7 +285,24 @@ impl Cpu {
 
                 false
             }
-            Instruction::AddCarry(_) => instr_todo!(instr),
+            Instruction::AddCarry(src) => {
+                let base = self.registers.a();
+                let val = self.get_arith_src(mem, src)?;
+                let cur_carry = if self.registers.carry_flag() { 1 } else { 0 };
+
+                let (res, new_carry) = base.overflowing_add(val + cur_carry);
+
+                self.registers.set_flags(
+                    res == 0,
+                    false,
+                    base.halfcarry_add(val + cur_carry),
+                    new_carry,
+                );
+
+                self.registers.set_a(res);
+
+                false
+            }
             Instruction::AddHL(reg) => {
                 let base = self.registers.hl();
                 let val = self.get_reg16_value(reg);
@@ -468,7 +485,19 @@ impl Cpu {
 
                 false
             }
-            Instruction::ShiftRightLogic(_) => instr_todo!(instr),
+            Instruction::ShiftRightLogic(tgt) => {
+                let val = self.get_prefarith_tgt(mem, tgt)?;
+
+                let carry = val.lsb_set();
+
+                let res = val.wrapping_shr(1);
+
+                self.registers.set_flags(res == 0, false, false, carry);
+
+                self.set_prefarith_tgt(mem, tgt, res)?;
+
+                false
+            }
             Instruction::Bit(bit, tgt) => {
                 let val = self.get_prefarith_tgt(mem, tgt)?;
 
@@ -489,7 +518,15 @@ impl Cpu {
 
                 false
             }
-            Instruction::Set(_, _) => instr_todo!(instr),
+            Instruction::Set(bit, tgt) => {
+                let val = self.get_prefarith_tgt(mem, tgt)?;
+
+                let bit: u8 = 0b1 << bit as usize;
+
+                self.set_prefarith_tgt(mem, tgt, val | bit)?;
+
+                false
+            }
             Instruction::Load8(dst, src) => {
                 let val = match src {
                     Ld8Src::Reg(reg) => self.get_reg8_value(reg),
@@ -640,7 +677,37 @@ impl Cpu {
 
                 false
             }
-            Instruction::DecimalAdjust => instr_todo!(instr),
+            Instruction::DecimalAdjust => {
+                let mut a = self.registers.a();
+                let cflag = self.registers.carry_flag();
+                let hflag = self.registers.half_carry_flag();
+
+                match self.registers.subtract_flag() {
+                    false => {
+                        if cflag || a > 0x99 {
+                            a = a.wrapping_add(0x60);
+                            self.registers.set_carry_flag(true);
+                        }
+                        if hflag || (a & 0x0F) > 0x09 {
+                            a = a.wrapping_add(0x6);
+                        }
+                    }
+                    true => {
+                        if cflag {
+                            a = a.wrapping_sub(0x60);
+                        }
+                        if hflag {
+                            a = a.wrapping_sub(0x6);
+                        }
+                    }
+                }
+
+                self.registers.set_zero_flag(a == 0);
+                self.registers.set_half_carry_flag(false);
+                self.registers.set_a(a);
+
+                false
+            }
             Instruction::ComplementAccumulator => {
                 self.registers.set_a(!self.registers.a());
                 self.registers.set_subtract_flag(true);
@@ -657,7 +724,15 @@ impl Cpu {
 
                 true
             }
-            Instruction::RotLeftCircularA => instr_todo!(instr),
+            Instruction::RotLeftCircularA => {
+                let pre = self.registers.a();
+
+                self.registers.set_carry_flag(pre.msb_set());
+
+                self.registers.set_a(pre.rotate_left(1));
+
+                false
+            }
             Instruction::RotRightCircularA => {
                 let pre = self.registers.a();
 

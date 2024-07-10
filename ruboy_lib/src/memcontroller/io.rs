@@ -155,6 +155,9 @@ pub struct IoRegs {
     /// 0xFF45
     pub lcd_y_comp: u8,
 
+    /// 0xFF46
+    pub oam_dma: u8,
+
     /// 0xFF47
     pub bg_palette: Palette,
 
@@ -194,6 +197,7 @@ impl IoRegs {
             scy: 0,
             scx: 0,
             lcd_y: 0,
+            oam_dma: 0,
             lcd_y_comp: 0,
             bg_palette: Palette::new(),
             obj0_palette: Palette::new(),
@@ -218,6 +222,7 @@ impl IoRegs {
             0xFF43 => self.scx = val,
             // 0xFF44 => self.lcd_y = val,
             0xFF45 => self.lcd_y_comp = val,
+            0xFF46 => self.oam_dma = val,
             0xFF47 => self.bg_palette = val.into(),
             0xFF48 => self.obj0_palette = val.into(),
             0xFF49 => self.obj1_palette = val.into(),
@@ -253,6 +258,7 @@ impl IoRegs {
             0xFF43 => Ok(self.scx),
             0xFF44 => Ok(self.lcd_y),
             0xFF45 => Ok(self.lcd_y_comp),
+            0xFF46 => Ok(self.oam_dma),
             0xFF47 => Ok(self.bg_palette.into()),
             0xFF48 => Ok(self.obj0_palette.into()),
             0xFF49 => Ok(self.obj1_palette.into()),

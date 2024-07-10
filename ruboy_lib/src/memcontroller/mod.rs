@@ -1,5 +1,6 @@
 use std::{error::Error, fmt::Display};
 
+use dma::{DMACommand, DMAController};
 use interrupts::Interrupts;
 use io::{IoReadErr, IoRegs, IoWriteErr};
 use thiserror::Error;
@@ -14,6 +15,7 @@ use crate::{
     },
 };
 
+mod dma;
 pub mod interrupts;
 pub mod io;
 
@@ -39,6 +41,9 @@ pub struct MemController<A: GBAllocator, R: RomReader> {
     ram: A::Mem<u8, { WORKRAM_SIZE as usize }>,
     oam: A::Mem<u8, { OAM_SIZE as usize }>,
     hram: A::Mem<u8, { HRAM_SIZE as usize }>,
+
+    dma_controller: DMAController,
+
     pub interrupts_enabled: Interrupts,
 
     /// If true, CPU can access VRAM
@@ -148,6 +153,9 @@ pub enum WriteErrType {
 
     #[error("Error during I/O register writing")]
     IORegs(#[from] IoWriteErr),
+
+    #[error("Error during DMA data reading")]
+    DMA(#[source] ReadError),
 }
 
 macro_rules! unimplemented_read {
@@ -178,6 +186,7 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
             ram: A::empty(),
             oam: A::empty(),
             hram: A::empty(),
+            dma_controller: DMAController::new(),
             io_registers: IoRegs::new(),
             interrupts_enabled: Interrupts::default(),
             vram_open: true,
@@ -265,6 +274,14 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
     }
 
     pub fn write8(&mut self, addr: u16, value: u8) -> Result<(), WriteError> {
+        if addr == 0xFF46 {
+            let command = dma::oam_dma_command(value, self)
+                .map_err(|e| self.w_err(addr, WriteErrType::DMA(e)))?;
+
+            // Special case that starts DMA transfer
+            self.dma_controller.push_oam(command);
+        }
+
         match self.map_to_region(addr) {
             MemRegion::BootRom => Err(self.w_err(addr, WriteErrType::ReadOnly)),
             MemRegion::Cartridge => self.rom.write(addr, value).map_err(|e| self.w_err(addr, e)),
@@ -310,6 +327,20 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
 
         self.write8(addr, bytes[0])?;
         self.write8(addr + 1, bytes[1])
+    }
+
+    pub fn dma_cycle(&mut self) -> Result<(), WriteError> {
+        for finished_transfer in self.dma_controller.run_cycle() {
+            log::info!(
+                "Finished DMA. Writing to 0x{:x}",
+                finished_transfer.target_address
+            );
+            for (idx, byte) in finished_transfer.data.into_iter().enumerate() {
+                self.write8(finished_transfer.target_address + (idx as u16), byte)?;
+            }
+        }
+
+        Ok(())
     }
 }
 

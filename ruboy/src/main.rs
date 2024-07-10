@@ -1,216 +1,30 @@
-use core::default;
-use core::time::Duration;
-use std::array;
-use std::fmt::Display;
+use std::fs::File;
 use std::io::BufReader;
 use std::ops::Deref;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use std::time::Instant;
-use std::{error::Error, fs::File};
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use eframe::egui::Key;
 use eframe::egui::{
-    self, load::SizedTexture, CentralPanel, Color32, ColorImage, Image, TextureHandle,
-    TextureOptions,
+    self, load::SizedTexture, CentralPanel, ColorImage, Image, TextureHandle, TextureOptions,
 };
-use eframe::egui::{InputState, Key};
 use eframe::NativeOptions;
-use ruboy_lib::{
-    Frame, GBGraphicsDrawer, GbInputs, GbMonoColor, InlineAllocator, InputHandler, Ruboy, FRAME_X,
-    FRAME_Y,
-};
+use input::keyboard::KeyboardInput;
+use input::Inputs;
+use menu::{draw_menu, MenuData};
+use ruboy_lib::{InlineAllocator, Ruboy};
 use std::sync::Mutex;
+use video::{FrameData, VideoOutput};
 
 use crate::args::CLIArgs;
 
 mod args;
-
-#[derive(Debug, Default)]
-struct Inputs {
-    up: AtomicBool,
-    down: AtomicBool,
-    left: AtomicBool,
-    right: AtomicBool,
-    start: AtomicBool,
-    select: AtomicBool,
-    a: AtomicBool,
-    b: AtomicBool,
-}
-
-#[derive(Debug, Clone)]
-struct KeyboardInput {
-    inputs: Arc<Inputs>,
-}
-
-impl InputHandler for KeyboardInput {
-    fn get_new_inputs(&mut self) -> ruboy_lib::GbInputs {
-        let inputs = self.inputs.as_ref();
-
-        GbInputs {
-            up: inputs.up.load(Ordering::Relaxed),
-            down: inputs.down.load(Ordering::Relaxed),
-            left: inputs.left.load(Ordering::Relaxed),
-            right: inputs.right.load(Ordering::Relaxed),
-            start: inputs.start.load(Ordering::Relaxed),
-            select: inputs.select.load(Ordering::Relaxed),
-            b: inputs.b.load(Ordering::Relaxed),
-            a: inputs.a.load(Ordering::Relaxed),
-        }
-    }
-}
-
-#[derive(Debug)]
-struct VideoOutput {
-    frame_dirty: Arc<AtomicBool>,
-    framebuf: Arc<Mutex<FrameData>>,
-    ui_ctx: egui::Context,
-    num_frames: usize,
-    last_frametime_check: Option<Instant>,
-}
-
-impl VideoOutput {
-    pub fn new(
-        dirty_flag: Arc<AtomicBool>,
-        framebuf: Arc<Mutex<FrameData>>,
-        ui_ctx: egui::Context,
-    ) -> Self {
-        Self {
-            frame_dirty: dirty_flag,
-            framebuf,
-            ui_ctx,
-            num_frames: 0,
-            last_frametime_check: None,
-        }
-    }
-
-    fn check_frametime(&mut self) {
-        if self.last_frametime_check.is_none() {
-            self.last_frametime_check = Some(Instant::now());
-            return;
-        }
-
-        let last_check_time = self.last_frametime_check.unwrap();
-
-        let now = Instant::now();
-        let duration_since = now.duration_since(last_check_time);
-        if duration_since > Duration::from_millis(100) {
-            log::debug!(
-                "FPS: {}",
-                self.num_frames as f64 / duration_since.as_secs_f64()
-            );
-
-            self.num_frames = 0;
-            self.last_frametime_check = Some(now);
-        }
-    }
-}
-
-#[derive(Debug)]
-struct VideoOutputErr(anyhow::Error);
-
-impl Display for VideoOutputErr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl Error for VideoOutputErr {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.0.source()
-    }
-}
-
-const WHITE: Color32 = Color32::from_rgb(123, 130, 15);
-const LIGHT_GRAY: Color32 = Color32::from_rgb(90, 121, 66);
-const DARK_GRAY: Color32 = Color32::from_rgb(57, 89, 74);
-const BLACK: Color32 = Color32::from_rgb(41, 65, 57);
-
-impl GBGraphicsDrawer for VideoOutput {
-    type Err = VideoOutputErr;
-
-    fn output(&mut self, frame: &Frame) -> std::result::Result<(), Self::Err> {
-        let converted_frame: Vec<Color32> = frame
-            .get_raw()
-            .iter()
-            .map(|color| match color {
-                GbMonoColor::White => WHITE,
-                GbMonoColor::LightGray => LIGHT_GRAY,
-                GbMonoColor::DarkGray => DARK_GRAY,
-                GbMonoColor::Black => BLACK,
-            })
-            .collect();
-
-        let mut locked_framebuf = self.framebuf.lock().unwrap();
-
-        for (i, pix) in locked_framebuf.buf.iter_mut().enumerate() {
-            *pix = converted_frame[i];
-        }
-
-        std::mem::drop(locked_framebuf);
-
-        self.frame_dirty.store(true, Ordering::Relaxed);
-
-        self.ui_ctx.request_repaint();
-
-        self.num_frames += 1;
-        self.check_frametime();
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-struct FrameData {
-    buf: [Color32; FRAME_X * FRAME_Y],
-}
-
-impl TryFrom<&[Color32]> for FrameData {
-    type Error = ();
-
-    fn try_from(value: &[Color32]) -> std::prelude::v1::Result<Self, Self::Error> {
-        if value.len() != FRAME_X * FRAME_Y {
-            return Err(());
-        }
-
-        Ok(Self {
-            buf: array::from_fn(|i| value[i]),
-        })
-    }
-}
-
-impl From<&FrameData> for ColorImage {
-    fn from(value: &FrameData) -> Self {
-        ColorImage {
-            size: [FRAME_X, FRAME_Y],
-            pixels: value.buf.to_vec(),
-        }
-    }
-}
-
-impl Default for FrameData {
-    fn default() -> Self {
-        let mut default_buf = [WHITE; FRAME_X * FRAME_Y];
-
-        let mut cur_color = 0;
-        for (y, row) in default_buf.chunks_mut(FRAME_X).enumerate() {
-            for (x, pixel) in row.iter_mut().enumerate() {
-                *pixel = Color32::from_rgb(
-                    ((x as f64) / (FRAME_X as f64) * 255.0) as u8,
-                    ((y as f64) / (FRAME_Y as f64) * 255.0) as u8,
-                    0,
-                )
-            }
-
-            cur_color = i32::min(3, cur_color + 1);
-        }
-
-        Self { buf: default_buf }
-    }
-}
+mod input;
+mod menu;
+mod video;
 
 struct RuboyApp {
     emu_thread: Option<JoinHandle<()>>,
@@ -220,6 +34,7 @@ struct RuboyApp {
     framebuf: Arc<Mutex<FrameData>>,
     frametex: Option<TextureHandle>,
     input_handler: Arc<Inputs>,
+    menu_data: MenuData,
 }
 
 impl RuboyApp {
@@ -232,6 +47,7 @@ impl RuboyApp {
             frame_dirty: Arc::new(AtomicBool::new(false)),
             frametex: None,
             input_handler: Arc::new(Inputs::default()),
+            menu_data: MenuData::default(),
         }
     }
 
@@ -305,18 +121,16 @@ impl RuboyApp {
         self.frame_dirty.store(true, Ordering::Relaxed);
     }
 
-    fn show_gameboy_frame(&mut self, ctx: &egui::Context) {
-        CentralPanel::default().show(ctx, |ui| {
-            ui.centered_and_justified(|ui| {
-                if self.frametex.is_some() {
-                    let sized_tex = SizedTexture::from_handle(&self.frametex.clone().unwrap());
+    fn show_gameboy_frame(&mut self, ui: &mut egui::Ui) {
+        ui.centered_and_justified(|ui| {
+            if self.frametex.is_some() {
+                let sized_tex = SizedTexture::from_handle(&self.frametex.clone().unwrap());
 
-                    let image = Image::new(sized_tex)
-                        .maintain_aspect_ratio(true)
-                        .shrink_to_fit();
-                    ui.add(image);
-                }
-            });
+                let image = Image::new(sized_tex)
+                    .maintain_aspect_ratio(true)
+                    .shrink_to_fit();
+                ui.add(image);
+            }
         });
     }
 
@@ -340,6 +154,11 @@ impl RuboyApp {
 
     fn update_keyboard_input(&mut self, ctx: &egui::Context) {
         ctx.input(|input| {
+            if !input.focused {
+                self.input_handler.set_to_none();
+                return;
+            }
+
             let keys_down = &input.keys_down;
 
             self.input_handler
@@ -380,7 +199,13 @@ impl eframe::App for RuboyApp {
 
         self.update_keyboard_input(ctx);
         self.update_texture_from_framedata();
-        self.show_gameboy_frame(ctx);
+
+        // Actual UI code now
+        CentralPanel::default().show(ctx, |ui| {
+            draw_menu(&mut self.menu_data, ui);
+            ui.separator();
+            self.show_gameboy_frame(ui);
+        });
     }
 }
 
@@ -399,7 +224,7 @@ fn emulator_thread(
 
     let video = VideoOutput::new(dirty_flag, framebuf, ctx);
 
-    let input = KeyboardInput { inputs };
+    let input = KeyboardInput::new(inputs);
 
     let ruboy = Ruboy::<InlineAllocator, _, _, _>::new(reader, video, input)
         .context("Could not initialize Ruboy")
