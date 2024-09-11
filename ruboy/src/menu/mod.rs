@@ -5,6 +5,8 @@ use rom::RomMenuData;
 use save::SaveMenuData;
 use window::WindowMenuData;
 
+use crate::RuboyApp;
+
 mod audio;
 mod debugger;
 mod rom;
@@ -20,26 +22,26 @@ pub struct MenuData {
     audio: AudioMenuData,
 }
 
-pub fn draw_menu(data: &mut MenuData, ui: &mut Ui) {
+pub fn draw_menu(app: &mut RuboyApp, ui: &mut Ui) {
     egui::menu::bar(ui, |ui| {
         ui.menu_button("ROM", |ui| {
-            rom::draw_menu(&mut data.rom, ui);
+            rom::draw_menu(app, ui);
         });
 
         ui.menu_button("Save", |ui| {
-            save::draw_menu(&mut data.save, ui);
+            save::draw_menu(app, ui);
         });
 
         ui.menu_button("Audio", |ui| {
-            audio::draw_menu(&mut data.audio, ui);
+            audio::draw_menu(app, ui);
         });
 
         ui.menu_button("Window", |ui| {
-            window::draw_menu(&mut data.window, ui);
+            window::draw_menu(app, ui);
         });
 
         ui.menu_button("Debugger", |ui| {
-            debugger::draw_menu(&mut data.debugger, ui);
+            debugger::draw_menu(app, ui);
         });
     });
 }

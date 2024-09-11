@@ -22,19 +22,14 @@ impl VideoOutput {
 }
 
 #[derive(Debug)]
-pub struct VideoOutputErr(anyhow::Error);
+pub enum VideoOutputErr {}
 
 impl Display for VideoOutputErr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        unreachable!();
     }
 }
-
-impl Error for VideoOutputErr {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.0.source()
-    }
-}
+impl Error for VideoOutputErr {}
 
 pub const WHITE: Color32 = Color32::from_rgb(123, 130, 15);
 pub const LIGHT_GRAY: Color32 = Color32::from_rgb(90, 121, 66);

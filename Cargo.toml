@@ -29,6 +29,7 @@ quote = "1.0.37"
 syn = "2.0.77"
 spin_sleep = "1.2.1"
 num = "0.4.3"
+rfd = "0.14.1"
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]

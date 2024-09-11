@@ -1,8 +1,8 @@
 use eframe::egui::Ui;
 
+use crate::RuboyApp;
+
 #[derive(Debug, Default)]
 pub struct WindowMenuData {}
 
-pub fn draw_menu(data: &mut WindowMenuData, ui: &mut Ui) {
-    ui.checkbox(&mut true, "Test checkbox");
-}
+pub fn draw_menu(app: &mut RuboyApp, ui: &mut Ui) {}

@@ -1,9 +1,9 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::ops::Deref;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use anyhow::{Context, Result};
 use clap::Parser;
 use eframe::egui::Key;
 use eframe::egui::{
@@ -23,19 +23,21 @@ mod menu;
 mod video;
 
 struct RuboyApp {
-    cli_args: CLIArgs,
-    prev_frame_time: Instant,
-    ruboy: Option<Ruboy<InlineAllocator, BufReader<File>, VideoOutput, SharedInputs>>,
-    frametex: Option<TextureHandle>,
-    input_handler: SharedInputs,
-    video_handler: VideoOutput,
-    menu_data: MenuData,
+    pub cli_args: CLIArgs,
+    pub rom: Option<PathBuf>,
+    pub prev_frame_time: Instant,
+    pub ruboy: Option<Ruboy<InlineAllocator, BufReader<File>, VideoOutput, SharedInputs>>,
+    pub frametex: Option<TextureHandle>,
+    pub input_handler: SharedInputs,
+    pub video_handler: VideoOutput,
+    pub menu_data: MenuData,
 }
 
 impl RuboyApp {
     pub fn new(args: CLIArgs) -> Self {
         Self {
             cli_args: args,
+            rom: None,
             prev_frame_time: Instant::now(),
             ruboy: None,
             frametex: None,
@@ -53,12 +55,10 @@ impl RuboyApp {
         }
     }
 
-    fn init_ruboy(&mut self) {
+    fn init_ruboy(&mut self, romfile: impl AsRef<Path>) {
         debug_assert!(self.ruboy.is_none());
 
-        let romfile = File::open(&self.cli_args.rom)
-            .context("Could not open file at provided path")
-            .unwrap();
+        let romfile = File::open(romfile).expect("Could not open file at provided path");
 
         let reader = BufReader::new(romfile);
 
@@ -67,8 +67,7 @@ impl RuboyApp {
             self.video_handler.clone(),
             self.input_handler.clone(),
         )
-        .context("Could not initialize Ruboy")
-        .unwrap();
+        .expect("Could not initialize Ruboy");
 
         self.ruboy = Some(ruboy);
         self.prev_frame_time = Instant::now();
@@ -84,9 +83,11 @@ impl RuboyApp {
         ));
     }
 
-    fn ensure_initialized(&mut self, ctx: &egui::Context) {
+    fn try_initialize(&mut self, ctx: &egui::Context) {
         if self.ruboy.is_none() {
-            self.init_ruboy();
+            if let Some(rom) = self.rom.clone() {
+                self.init_ruboy(rom);
+            }
         }
 
         if self.frametex.is_none() {
@@ -140,12 +141,8 @@ impl RuboyApp {
             inputs.select = keys_down.contains(&Key::Backspace);
         });
     }
-}
 
-impl eframe::App for RuboyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.ensure_initialized(ctx);
-
+    fn step_emulator(&mut self, ctx: &egui::Context) {
         self.update_keyboard_input(ctx);
 
         let cur_time = Instant::now();
@@ -156,11 +153,26 @@ impl eframe::App for RuboyApp {
         self.prev_frame_time = cur_time;
 
         self.update_texture_from_framedata();
+    }
+}
+
+impl eframe::App for RuboyApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.try_initialize(ctx);
+
+        if self.ruboy.is_some() {
+            self.step_emulator(ctx);
+        }
 
         // Actual UI code now
         CentralPanel::default().show(ctx, |ui| {
-            draw_menu(&mut self.menu_data, ui);
+            draw_menu(self, ui);
             ui.separator();
+
+            if self.ruboy.is_none() {
+                ui.label("No ROM selected. Select a ROM with 'ROM -> Open'");
+            }
+
             self.show_gameboy_frame(ui);
         });
 
@@ -168,7 +180,7 @@ impl eframe::App for RuboyApp {
     }
 }
 
-fn main() -> Result<()> {
+fn main() {
     let args = CLIArgs::parse();
 
     let logconfig = simplelog::ConfigBuilder::new()
@@ -198,6 +210,4 @@ fn main() -> Result<()> {
         Box::new(|_| Ok(Box::new(RuboyApp::new(args)))),
     )
     .expect("Could not initialize window");
-
-    Ok(())
 }
