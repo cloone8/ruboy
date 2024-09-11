@@ -19,33 +19,28 @@ static_assertions = "1.1.0"
 cfg-if = "1.0.0"
 log = "0.4.22"
 simplelog = "0.12.2"
-thiserror = "1.0.61"
-clap = { version = "4.5.8", features = ["derive"] }
-anyhow = "1.0.86"
+thiserror = "1.0.63"
+clap = { version = "4.5.17", features = ["derive"] }
+anyhow = "1.0.87"
 colored = "2.1.0"
 unicode-width = "0.1.13"
 eframe = "0.28.1"
-quote = "1.0.36"
-syn = "2.0.69"
-spin_sleep = "1.2.0"
+quote = "1.0.37"
+syn = "2.0.77"
+spin_sleep = "1.2.1"
 num = "0.4.3"
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.16.0"
+cargo-dist-version = "0.22.1"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
 installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = [
-    "aarch64-apple-darwin",
-    "x86_64-apple-darwin",
-    "x86_64-unknown-linux-gnu",
-    "x86_64-pc-windows-msvc",
-]
-# Publish jobs to run in CI
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+# Which actions to run on pull requests
 pr-run-mode = "plan"
 
 # The profile that 'cargo dist' will build with
