@@ -1,5 +1,4 @@
 use std::fmt::Display;
-use std::time::Duration;
 use std::time::Instant;
 
 use cpu::Cpu;
@@ -9,8 +8,8 @@ use memcontroller::MemController;
 
 use memcontroller::MemControllerInitErr;
 use memcontroller::WriteError;
-use ppu::Ppu;
 use ppu::PpuErr;
+use ppu::{Ppu, FRAME_CYCLES};
 use thiserror::Error;
 
 mod boot;
@@ -24,13 +23,9 @@ pub mod rom;
 
 pub use extern_traits::*;
 
-const TARGET_CLOCK_SPEED_HZ: u64 = 1 << 22;
-const SPEED_CHECK_INTERVAL_MS: u64 = 10;
-const SPEED_CHECK_INTERVAL_DURATION: Duration = Duration::from_millis(SPEED_CHECK_INTERVAL_MS);
-const CYCLES_PER_INTERVAL: u64 = (TARGET_CLOCK_SPEED_HZ * SPEED_CHECK_INTERVAL_MS) / 1000;
-
-const SPEED_REPORT_INTERVAL_MS: u64 = 1000;
-const SPEED_REPORT_INTERVAL_DURATION: Duration = Duration::from_millis(SPEED_REPORT_INTERVAL_MS);
+pub const CLOCK_SPEED_HZ: usize = 1 << 22;
+pub const CLOCK_SPEED_HZ_F64: f64 = CLOCK_SPEED_HZ as f64;
+pub const DESIRED_FRAMERATE: f64 = CLOCK_SPEED_HZ_F64 / (FRAME_CYCLES as f64);
 
 pub struct Ruboy<A, R, V, I>
 where
@@ -39,6 +34,7 @@ where
     V: GBGraphicsDrawer,
     I: InputHandler,
 {
+    cycle_accumulator: f64,
     cpu: Cpu,
     ppu: Ppu<V>,
     mem: MemController<A, R>,
@@ -119,12 +115,10 @@ pub enum RuboyErr<V: GBGraphicsDrawer> {
     Dma(#[source] WriteError),
 }
 
-// impl<V: GBGraphicsDrawer> std::error::Error for RuboyErr<V> {}
-// impl<V: GBGraphicsDrawer> Display for RuboyErr<V> {}
-
 impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer, I: InputHandler> Ruboy<A, R, V, I> {
     pub fn new(rom: R, output: V, input: I) -> Result<Self, RuboyStartErr<R>> {
         Ok(Self {
+            cycle_accumulator: 0.0,
             cpu: Cpu::new(),
             ppu: Ppu::new(output),
             mem: MemController::new(rom)?,
@@ -132,16 +126,23 @@ impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer, I: InputHandler> Ruboy<A
         })
     }
 
-    pub fn start(mut self) -> Result<(), RuboyErr<V>> {
-        log::info!("Starting Ruboy Emulator");
+    pub fn step(&mut self, dt: f64) -> Result<usize, RuboyErr<V>> {
+        log::debug!("Stepping emulator {} seconds", dt);
 
-        let mut cycles_since_last_check = 0_usize;
-        let mut cycles_since_last_report = 0_usize;
+        let cycles_dt = dt * CLOCK_SPEED_HZ_F64;
+        let (mut cycles_to_run, accumulated) = split_f64(cycles_dt);
 
-        let mut last_speed_check = Instant::now();
-        let mut last_report = Instant::now();
+        self.cycle_accumulator += accumulated;
+        let (extra_cycles, new_accumulator) = split_f64(self.cycle_accumulator);
 
-        loop {
+        cycles_to_run += extra_cycles;
+        self.cycle_accumulator = new_accumulator;
+
+        debug_assert!(cycles_to_run >= 0);
+
+        log::trace!("Running {} cycles", cycles_to_run as usize);
+
+        for _ in 0..(cycles_to_run as usize) {
             let (new_joypad_reg_value, can_raise_joypad_interrupt) =
                 apply_input_to(self.mem.io_registers.joypad, self.input.get_new_inputs());
 
@@ -153,34 +154,14 @@ impl<A: GBAllocator, R: RomReader, V: GBGraphicsDrawer, I: InputHandler> Ruboy<A
             self.cpu.run_cycle(&mut self.mem)?;
             self.ppu.run_cycle(&mut self.mem)?;
             self.mem.dma_cycle().map_err(|e| RuboyErr::Dma(e))?;
-
-            cycles_since_last_check += 1;
-            cycles_since_last_report += 1;
-
-            // Report clock speed to the user
-            let last_report_elapsed = last_report.elapsed();
-            if last_report_elapsed >= SPEED_REPORT_INTERVAL_DURATION {
-                let cycles_per_second = Frequency::new(
-                    cycles_since_last_report as f64 / last_report_elapsed.as_secs_f64(),
-                );
-
-                log::debug!("Current speed: {}", cycles_per_second);
-                cycles_since_last_report = 0;
-                last_report = Instant::now();
-            }
-
-            // Make sure we're keeping roughly in sync with the original gameboy
-            // clockspeed
-            let last_check_elapsed = last_speed_check.elapsed();
-
-            if last_check_elapsed >= SPEED_CHECK_INTERVAL_DURATION {
-                cycles_since_last_check = 0;
-                last_speed_check = Instant::now();
-            } else if cycles_since_last_check >= CYCLES_PER_INTERVAL as usize {
-                let wake_time = last_speed_check + SPEED_CHECK_INTERVAL_DURATION;
-
-                spin_sleep::sleep(wake_time.duration_since(Instant::now()));
-            }
         }
+
+        Ok(cycles_to_run as usize)
     }
+}
+
+fn split_f64(f: f64) -> (i64, f64) {
+    let truncated = f.trunc();
+
+    (truncated as i64, f - truncated)
 }

@@ -20,7 +20,7 @@ mod tilemap;
 
 const OAM_CYCLES: usize = 80;
 const SCANLINE_CYCLES: usize = 456;
-const FRAME_CYCLES: usize = SCANLINE_CYCLES * (FRAME_Y + 8);
+pub const FRAME_CYCLES: usize = SCANLINE_CYCLES * (FRAME_Y + 8);
 
 #[derive(Debug, Clone)]
 enum PpuMode {

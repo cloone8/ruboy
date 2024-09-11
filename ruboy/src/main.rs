@@ -1,9 +1,7 @@
 use std::fs::File;
 use std::io::BufReader;
 use std::ops::Deref;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::thread::{self, JoinHandle};
+use std::time::Instant;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -12,12 +10,10 @@ use eframe::egui::{
     self, load::SizedTexture, CentralPanel, ColorImage, Image, TextureHandle, TextureOptions,
 };
 use eframe::NativeOptions;
-use input::keyboard::KeyboardInput;
-use input::Inputs;
+use input::SharedInputs;
 use menu::{draw_menu, MenuData};
 use ruboy_lib::{InlineAllocator, Ruboy};
-use std::sync::Mutex;
-use video::{FrameData, VideoOutput};
+use video::VideoOutput;
 
 use crate::args::CLIArgs;
 
@@ -27,26 +23,24 @@ mod menu;
 mod video;
 
 struct RuboyApp {
-    emu_thread: Option<JoinHandle<()>>,
-    emu_died: bool,
     cli_args: CLIArgs,
-    frame_dirty: Arc<AtomicBool>,
-    framebuf: Arc<Mutex<FrameData>>,
+    prev_frame_time: Instant,
+    ruboy: Option<Ruboy<InlineAllocator, BufReader<File>, VideoOutput, SharedInputs>>,
     frametex: Option<TextureHandle>,
-    input_handler: Arc<Inputs>,
+    input_handler: SharedInputs,
+    video_handler: VideoOutput,
     menu_data: MenuData,
 }
 
 impl RuboyApp {
     pub fn new(args: CLIArgs) -> Self {
         Self {
-            emu_thread: None,
-            emu_died: false,
             cli_args: args,
-            framebuf: Arc::new(Mutex::new(FrameData::default())),
-            frame_dirty: Arc::new(AtomicBool::new(false)),
+            prev_frame_time: Instant::now(),
+            ruboy: None,
             frametex: None,
-            input_handler: Arc::new(Inputs::default()),
+            input_handler: SharedInputs::new(),
+            video_handler: VideoOutput::new(),
             menu_data: MenuData::default(),
         }
     }
@@ -59,46 +53,40 @@ impl RuboyApp {
         }
     }
 
-    fn init_emuthread(&mut self, ctx: &egui::Context) {
-        debug_assert!(self.emu_thread.is_none());
+    fn init_ruboy(&mut self) {
+        debug_assert!(self.ruboy.is_none());
 
-        let thread_args = self.cli_args.clone();
-        let cloned_framebuf = self.framebuf.clone();
-        let cloned_dirty_flag = self.frame_dirty.clone();
-        let cloned_context = ctx.clone();
-        let cloned_inputs = self.input_handler.clone();
+        let romfile = File::open(&self.cli_args.rom)
+            .context("Could not open file at provided path")
+            .unwrap();
 
-        let thread = thread::Builder::new()
-            .name("emulator".to_owned())
-            .spawn(move || {
-                emulator_thread(
-                    cloned_context,
-                    thread_args,
-                    cloned_inputs,
-                    cloned_framebuf,
-                    cloned_dirty_flag,
-                )
-            })
-            .expect("Could not spawn emulator thread");
+        let reader = BufReader::new(romfile);
 
-        self.emu_thread = Some(thread);
+        let ruboy = Ruboy::<InlineAllocator, _, _, _>::new(
+            reader,
+            self.video_handler.clone(),
+            self.input_handler.clone(),
+        )
+        .context("Could not initialize Ruboy")
+        .unwrap();
+
+        self.ruboy = Some(ruboy);
+        self.prev_frame_time = Instant::now();
     }
 
     fn init_gbtexture(&mut self, ctx: &egui::Context) {
         debug_assert!(self.frametex.is_none());
 
-        let framedata = self.framebuf.lock().unwrap();
-
         self.frametex = Some(ctx.load_texture(
             "Ruboy Display",
-            ColorImage::from(framedata.deref()),
+            ColorImage::from(self.video_handler.framebuf.borrow().deref()),
             Self::get_gb_tex_options(),
         ));
     }
 
     fn ensure_initialized(&mut self, ctx: &egui::Context) {
-        if self.emu_thread.is_none() && !self.emu_died {
-            self.init_emuthread(ctx);
+        if self.ruboy.is_none() {
+            self.init_ruboy();
         }
 
         if self.frametex.is_none() {
@@ -107,18 +95,16 @@ impl RuboyApp {
     }
 
     fn update_texture_from_framedata(&mut self) {
-        if !self.frame_dirty.load(Ordering::Relaxed) {
+        if !(*self.video_handler.dirty.borrow()) {
             return;
         }
 
-        let locked_framebuf = self.framebuf.lock().unwrap();
-
         self.frametex.as_mut().unwrap().set(
-            ColorImage::from(locked_framebuf.deref()),
+            ColorImage::from(self.video_handler.framebuf.borrow().deref()),
             Self::get_gb_tex_options(),
         );
 
-        self.frame_dirty.store(true, Ordering::Relaxed);
+        *self.video_handler.dirty.borrow_mut() = false;
     }
 
     fn show_gameboy_frame(&mut self, ui: &mut egui::Ui) {
@@ -134,57 +120,24 @@ impl RuboyApp {
         });
     }
 
-    fn ensure_emulator_alive(&mut self) -> bool {
-        match &mut self.emu_thread {
-            Some(handle) => {
-                if handle.is_finished() {
-                    self.emu_died = true;
-                    let handle = self.emu_thread.take().unwrap();
-
-                    let _ = handle.join();
-
-                    false
-                } else {
-                    true
-                }
-            }
-            None => false,
-        }
-    }
-
     fn update_keyboard_input(&mut self, ctx: &egui::Context) {
         ctx.input(|input| {
             if !input.focused {
-                self.input_handler.set_to_none();
+                self.input_handler.inputs.borrow_mut().set_to_none();
                 return;
             }
 
             let keys_down = &input.keys_down;
+            let mut inputs = self.input_handler.inputs.borrow_mut();
 
-            self.input_handler
-                .left
-                .store(keys_down.contains(&Key::ArrowLeft), Ordering::Relaxed);
-            self.input_handler
-                .right
-                .store(keys_down.contains(&Key::ArrowRight), Ordering::Relaxed);
-            self.input_handler
-                .up
-                .store(keys_down.contains(&Key::ArrowUp), Ordering::Relaxed);
-            self.input_handler
-                .down
-                .store(keys_down.contains(&Key::ArrowDown), Ordering::Relaxed);
-            self.input_handler
-                .a
-                .store(keys_down.contains(&Key::A), Ordering::Relaxed);
-            self.input_handler
-                .b
-                .store(keys_down.contains(&Key::B), Ordering::Relaxed);
-            self.input_handler
-                .start
-                .store(keys_down.contains(&Key::Enter), Ordering::Relaxed);
-            self.input_handler
-                .select
-                .store(keys_down.contains(&Key::Backspace), Ordering::Relaxed);
+            inputs.left = keys_down.contains(&Key::ArrowLeft);
+            inputs.right = keys_down.contains(&Key::ArrowRight);
+            inputs.up = keys_down.contains(&Key::ArrowUp);
+            inputs.down = keys_down.contains(&Key::ArrowDown);
+            inputs.a = keys_down.contains(&Key::A);
+            inputs.b = keys_down.contains(&Key::B);
+            inputs.start = keys_down.contains(&Key::Enter);
+            inputs.select = keys_down.contains(&Key::Backspace);
         });
     }
 }
@@ -193,11 +146,15 @@ impl eframe::App for RuboyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.ensure_initialized(ctx);
 
-        if !self.ensure_emulator_alive() {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-        }
-
         self.update_keyboard_input(ctx);
+
+        let cur_time = Instant::now();
+
+        let dt = cur_time.duration_since(self.prev_frame_time).as_secs_f64();
+        let _cycles_ran = self.ruboy.as_mut().unwrap().step(dt).unwrap();
+
+        self.prev_frame_time = cur_time;
+
         self.update_texture_from_framedata();
 
         // Actual UI code now
@@ -206,34 +163,9 @@ impl eframe::App for RuboyApp {
             ui.separator();
             self.show_gameboy_frame(ui);
         });
+
+        ctx.request_repaint();
     }
-}
-
-fn emulator_thread(
-    ctx: egui::Context,
-    args: CLIArgs,
-    inputs: Arc<Inputs>,
-    framebuf: Arc<Mutex<FrameData>>,
-    dirty_flag: Arc<AtomicBool>,
-) {
-    let romfile = File::open(args.rom)
-        .context("Could not open file at provided path")
-        .unwrap();
-
-    let reader = BufReader::new(romfile);
-
-    let video = VideoOutput::new(dirty_flag, framebuf, ctx);
-
-    let input = KeyboardInput::new(inputs);
-
-    let ruboy = Ruboy::<InlineAllocator, _, _, _>::new(reader, video, input)
-        .context("Could not initialize Ruboy")
-        .unwrap();
-
-    ruboy
-        .start()
-        .context("Error during Ruboy execution")
-        .unwrap();
 }
 
 fn main() -> Result<()> {
