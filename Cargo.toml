@@ -3,7 +3,7 @@ resolver = "2"
 members = ["ruboy", "ruboy_lib", "ruboy_binutils", "ruboy_proc_macro"]
 
 [workspace.package]
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
 authors = ["Wouter de Bruijn <wouter@wutru.io>"]
 homepage = "https://github.com/cloone8/cpr_gameboy"
@@ -13,8 +13,8 @@ keywords = ["gameboy", "emulation", "game", "library"]
 categories = ["emulators"]
 
 [workspace.dependencies]
-ruboy_lib = { path = "ruboy_lib", version = "0.1.6" }
-ruboy_proc_macro = { path = "ruboy_proc_macro", version = "0.1.6" }
+ruboy_lib = { path = "ruboy_lib", version = "0.1.7" }
+ruboy_proc_macro = { path = "ruboy_proc_macro", version = "0.1.7" }
 static_assertions = "1.1.0"
 cfg-if = "1.0.0"
 log = "0.4.22"
@@ -39,7 +39,12 @@ ci = "github"
 # The installers to generate for each app
 installers = []
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+]
 # Which actions to run on pull requests
 pr-run-mode = "plan"
 

@@ -2618,7 +2618,7 @@ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "ruboy"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -2630,7 +2630,7 @@ dependencies = [
 
 [[package]]
 name = "ruboy_binutils"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -2642,7 +2642,7 @@ dependencies = [
 
 [[package]]
 name = "ruboy_lib"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "cfg-if",
  "log",
@@ -2655,7 +2655,7 @@ dependencies = [
 
 [[package]]
 name = "ruboy_proc_macro"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "quote",
  "syn 2.0.77",

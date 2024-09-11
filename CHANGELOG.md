@@ -2,6 +2,12 @@
 
 This file will document the most important changes for each released version.
 
+## [v0.1.7]
+
+### All
+- Changed emulator cycle-stepping method to being caller driven instead of emulator driven. This means that, instead of Ruboy internally running as fast as possible and throttling itself with busylooping to stay at the correct speed, it now runs exactly the amount of cycles needed to fill the delta-time given by the caller. This allows the emulator to run those cycles as fast as possible and to then return control back to the caller.
+- Updated dependencies
+
 ## [v0.1.6]
 
 ### All
