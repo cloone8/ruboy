@@ -2785,7 +2785,7 @@ dependencies = [
 
 [[package]]
 name = "ruboy"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "clap",
  "eframe",
@@ -2797,7 +2797,7 @@ dependencies = [
 
 [[package]]
 name = "ruboy_binutils"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "clap",
@@ -2809,7 +2809,7 @@ dependencies = [
 
 [[package]]
 name = "ruboy_lib"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "cfg-if",
  "log",
@@ -2822,7 +2822,7 @@ dependencies = [
 
 [[package]]
 name = "ruboy_proc_macro"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "quote",
  "syn 2.0.77",

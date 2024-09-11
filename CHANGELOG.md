@@ -2,6 +2,11 @@
 
 This file will document the most important changes for each released version.
 
+## [v0.1.8]
+
+### Ruboy GUI
+- ROMs can now be opened through the GUI menu
+
 ## [v0.1.7]
 
 ### All
