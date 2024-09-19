@@ -26,6 +26,9 @@ pub struct CLIArgs {
 
     #[command(flatten)]
     pub immediate_format: ParsableImmediateFormat,
+
+    #[arg(long, default_value_t = false)]
+    pub no_print_label: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]

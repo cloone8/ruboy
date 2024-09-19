@@ -52,7 +52,7 @@ impl<R: Read + Seek + ?Sized> DecoderReadable for SmartReader<R> {
     }
 }
 
-fn display_output(instructions: &HashMap<usize, String>) {
+fn display_output(print_addr: bool, instructions: &HashMap<usize, String>) {
     let mut sorted: Vec<(usize, _)> = instructions
         .iter()
         .map(|(&addr, instr)| (addr, instr))
@@ -63,7 +63,11 @@ fn display_output(instructions: &HashMap<usize, String>) {
     let mut output = ListOutput::new();
 
     for (addr, instr) in sorted {
-        output.add_single(format!("0x{:x}", addr), instr);
+        if print_addr {
+            output.add_single(format!("0x{:x}", addr), instr);
+        } else {
+            output.add_single("", instr);
+        }
     }
 
     println!("{}", output);
@@ -130,7 +134,7 @@ fn main() -> Result<()> {
         .map(|(addr, instr)| (addr, format_instruction(instr, &format_opts)))
         .collect();
 
-    display_output(&instructions_formatted);
+    display_output(!args.no_print_label, &instructions_formatted);
 
     Ok(())
 }

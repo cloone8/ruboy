@@ -67,7 +67,12 @@ impl ListItem {
         assert!(label.width() <= label_width, "Label too long");
 
         let padding = " ".repeat(label_width - label.width());
-        let padded_label = format!("{}: {}", label, padding);
+
+        let padded_label = if !label.is_empty() {
+            format!("{}: {}", label, padding)
+        } else {
+            "".to_string()
+        };
 
         match self {
             ListItem::Single { label: _, value } => {
