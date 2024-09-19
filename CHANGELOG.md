@@ -7,6 +7,10 @@ This file will document the most important changes for each released version.
 ### Ruboy GUI
 - ROMs can now be opened through the GUI menu
 
+### ruboy_dasm
+
+- Added option to not print instruction addresses
+
 ## [v0.1.7]
 
 ### All
