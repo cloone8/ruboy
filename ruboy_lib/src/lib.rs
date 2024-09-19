@@ -41,61 +41,6 @@ where
     input: I,
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Frequency {
-    None(f64),
-    Kilo(f64),
-    Mega(f64),
-    Giga(f64),
-}
-
-impl Frequency {
-    pub fn new(val: f64) -> Self {
-        Self::None(val).upcast()
-    }
-
-    pub fn val_raw(self) -> f64 {
-        match self {
-            Frequency::None(x) => x,
-            Frequency::Kilo(x) => x * 1000.0,
-            Frequency::Mega(x) => x * (1000.0 * 1000.0),
-            Frequency::Giga(x) => x * (1000.0 * 1000.0 * 1000.0),
-        }
-    }
-
-    pub fn val_unit(self) -> f64 {
-        match self {
-            Frequency::None(x) => x,
-            Frequency::Kilo(x) => x,
-            Frequency::Mega(x) => x,
-            Frequency::Giga(x) => x,
-        }
-    }
-    pub fn upcast(self) -> Self {
-        if self.val_unit() > 1000.0 {
-            match self {
-                Frequency::None(x) => Frequency::Kilo(x / 1000.0).upcast(),
-                Frequency::Kilo(x) => Frequency::Mega(x / 1000.0).upcast(),
-                Frequency::Mega(x) => Frequency::Giga(x / 1000.0).upcast(),
-                Frequency::Giga(_) => self,
-            }
-        } else {
-            self
-        }
-    }
-}
-
-impl Display for Frequency {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Frequency::None(x) => write!(f, "{:.6}Hz", x),
-            Frequency::Kilo(x) => write!(f, "{:.6}KHz", x),
-            Frequency::Mega(x) => write!(f, "{:.6}MHz", x),
-            Frequency::Giga(x) => write!(f, "{:.6}GHz", x),
-        }
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum RuboyStartErr<R: RomReader> {
     #[error("Could not initialize memory controller: {0}")]
@@ -103,7 +48,6 @@ pub enum RuboyStartErr<R: RomReader> {
 }
 
 #[derive(Debug, Error)]
-// #[derive(Debug)]
 pub enum RuboyErr<V: GBGraphicsDrawer> {
     #[error("Error during CPU cycle")]
     Cpu(#[from] CpuErr),
