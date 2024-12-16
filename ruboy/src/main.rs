@@ -52,6 +52,7 @@ impl RuboyApp {
             magnification: egui::TextureFilter::Nearest,
             minification: egui::TextureFilter::Nearest,
             wrap_mode: egui::TextureWrapMode::ClampToEdge,
+            mipmap_mode: Some(egui::TextureFilter::Nearest),
         }
     }
 

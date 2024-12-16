@@ -2,6 +2,8 @@
 
 This file will document the most important changes for each released version.
 
+## [v0.1.9]
+
 ## [v0.1.8]
 
 ### Ruboy GUI
