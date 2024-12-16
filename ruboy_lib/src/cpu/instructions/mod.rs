@@ -216,7 +216,18 @@ impl Cpu {
 
                 false
             }
-            Instruction::RotRight(_) => instr_todo!(instr),
+            Instruction::RotRight(tgt) => {
+                let init_val = self.get_prefarith_tgt(mem, tgt)?;
+                let shifted = init_val.wrapping_shr(1);
+                let result = shifted.set_msb(self.registers.carry_flag());
+
+                self.registers
+                    .set_flags(result == 0, false, false, init_val.lsb_set());
+
+                self.set_prefarith_tgt(mem, tgt, result)?;
+
+                false
+            }
             Instruction::ShiftLeftArith(tgt) => {
                 let init_val = self.get_prefarith_tgt(mem, tgt)?;
                 let shifted = init_val.wrapping_shl(1);

@@ -84,7 +84,10 @@ impl<A: GBAllocator, R: RomReader> Mbc1<A, R> {
 impl<A: GBAllocator, R: RomReader> Mbc for Mbc1<A, R> {
     fn read(&self, addr: u16) -> Result<u8, super::ReadError> {
         match addr {
-            0x0000..=0x3FFF => Ok(self.rom_bank_x0.read(addr)),
+            0x0000..=0x3FFF => match self.addressing_mode {
+                AddrMode::Mode0 => Ok(self.rom_bank_x0.read(addr)),
+                AddrMode::Mode1 => todo!(),
+            },
             0x4000..=0x7FFF => Ok(self.rom_bank_1x.read(addr - 0x4000)),
             0xA000..=0xBFFF => {
                 let ram_size = self.meta.ram_size().in_bytes();
@@ -93,7 +96,12 @@ impl<A: GBAllocator, R: RomReader> Mbc for Mbc1<A, R> {
                 }
 
                 if self.ram_enabled {
-                    Ok(self.ram_bank_x.read(addr - 0xA000))
+                    let ram_addr = match self.addressing_mode {
+                        AddrMode::Mode0 => addr - 0xA000,
+                        AddrMode::Mode1 => todo!(),
+                    };
+
+                    Ok(self.ram_bank_x.read(ram_addr))
                 } else {
                     Ok(0xFF)
                 }

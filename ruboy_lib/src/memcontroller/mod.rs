@@ -27,6 +27,10 @@ pub const WORKRAM_START: u16 = 0xC000;
 pub const WORKRAM_END: u16 = 0xE000;
 pub const WORKRAM_SIZE: u16 = WORKRAM_END - WORKRAM_START;
 
+pub const ECHORAM_START: u16 = 0xE000;
+pub const ECHORAM_END: u16 = 0xFE00;
+pub const ECHORAM_SIZE: u16 = ECHORAM_END - ECHORAM_START;
+
 pub const OAM_START: u16 = 0xFE00;
 pub const OAM_END: u16 = 0xFEA0;
 pub const OAM_SIZE: u16 = OAM_END - OAM_START;
@@ -254,7 +258,7 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
                 Ok(res)
             }
             MemRegion::WorkRam => Ok(self.ram.read(addr - WORKRAM_START)),
-            MemRegion::EchoRam => unimplemented_read!(MemRegion::EchoRam),
+            MemRegion::EchoRam => Ok(self.ram.read(addr - ECHORAM_START)),
             MemRegion::ObjectAttrMem => Ok(self.oam.read(addr - OAM_START)),
             MemRegion::Prohibited => unimplemented_read!(MemRegion::Prohibited),
             MemRegion::IORegs => self
@@ -294,7 +298,10 @@ impl<A: GBAllocator, R: RomReader> MemController<A, R> {
                 self.ram.write(addr - WORKRAM_START, value);
                 Ok(())
             }
-            MemRegion::EchoRam => unimplemented_write!(MemRegion::EchoRam),
+            MemRegion::EchoRam => {
+                self.ram.write(addr - ECHORAM_START, value);
+                Ok(())
+            }
             MemRegion::ObjectAttrMem => {
                 self.oam.write(addr - OAM_START, value);
                 Ok(())
