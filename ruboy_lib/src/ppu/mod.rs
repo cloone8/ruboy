@@ -8,7 +8,7 @@ use thiserror::Error;
 use crate::{
     extern_traits::{Frame, GBAllocator, GBGraphicsDrawer, RomReader, FRAME_X, FRAME_Y},
     memcontroller::{MemController, ReadError, OAM_START},
-    GbColorID, GbMonoColor,
+    GbColorID,
 };
 
 mod fetcher;

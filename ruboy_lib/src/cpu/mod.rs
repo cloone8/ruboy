@@ -126,6 +126,7 @@ impl Cpu {
         self.registers.set_pc(jump_addr);
     }
 
+    #[expect(unused, reason = "Matching other imlpementations")]
     fn do_push8(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,
@@ -135,6 +136,7 @@ impl Cpu {
         mem.write8(self.registers.sp(), val)
     }
 
+    #[expect(unused, reason = "Matching other imlpementations")]
     fn do_pop8(
         &mut self,
         mem: &mut MemController<impl GBAllocator, impl RomReader>,

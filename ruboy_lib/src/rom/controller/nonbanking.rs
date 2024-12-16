@@ -1,3 +1,4 @@
+use crate::rom::controller::bank_num_to_addr;
 use crate::{
     extern_traits::{GBAllocator, GBRam, RomReader},
     rom::meta::RomMeta,
@@ -22,7 +23,7 @@ impl<A: GBAllocator> NonBankingController<A> {
             ram_content: A::empty(),
         };
 
-        reader.read_into(new.rom_content.raw_mut(), 0)?;
+        reader.read_into(new.rom_content.raw_mut(), bank_num_to_addr(0))?;
 
         Ok(new)
     }

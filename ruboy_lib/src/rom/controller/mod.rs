@@ -1,13 +1,14 @@
-use std::marker::PhantomData;
-
+use mbc1::Mbc1;
 use nonbanking::NonBankingController;
 use thiserror::Error;
 
 use crate::extern_traits::GBAllocator;
+use crate::rom::meta::CartridgeMapper;
 
 use super::meta::{RomMeta, RomMetaParseError};
 use crate::extern_traits::RomReader;
 
+mod mbc1;
 mod nonbanking;
 
 trait Mbc {
@@ -19,8 +20,7 @@ trait Mbc {
 #[allow(unused_associated_type_bounds)]
 pub enum RomController<A: GBAllocator, R: RomReader> {
     None(NonBankingController<A>),
-    // TODO: Remove when an actual variant that uses R is introduced
-    Phantom(PhantomData<R>),
+    Mbc1(Mbc1<A, R>),
 }
 
 impl<A: GBAllocator, R: RomReader> RomController<A, R> {
@@ -36,7 +36,12 @@ impl<A: GBAllocator, R: RomReader> RomController<A, R> {
         log::debug!("Resolving ROM mapper type");
 
         let controller = match meta.cartridge_hardware().mapper() {
-            Some(mapper) => todo!("MBC not yet implemented: {}", mapper),
+            Some(mapper) => match mapper {
+                CartridgeMapper::MBC1 => RomController::Mbc1(
+                    Mbc1::new(meta, rom).map_err(|e| RomControllerInitErr::Read(e))?,
+                ),
+                _ => todo!("ROM controller not yet implemented: {}", mapper),
+            },
             None => RomController::None(
                 NonBankingController::new(meta, rom).map_err(|e| RomControllerInitErr::Read(e))?,
             ),
@@ -48,7 +53,7 @@ impl<A: GBAllocator, R: RomReader> RomController<A, R> {
     pub fn read(&self, addr: u16) -> Result<u8, ReadError> {
         let result = match self {
             RomController::None(c) => c.read(addr)?,
-            RomController::Phantom(_) => todo!(),
+            RomController::Mbc1(mbc) => mbc.read(addr)?,
         };
 
         Ok(result)
@@ -57,7 +62,7 @@ impl<A: GBAllocator, R: RomReader> RomController<A, R> {
     pub fn write(&mut self, addr: u16, val: u8) -> Result<(), WriteError> {
         match self {
             RomController::None(c) => c.write(addr, val)?,
-            RomController::Phantom(_) => todo!(),
+            RomController::Mbc1(mbc) => mbc.write(addr, val)?,
         };
 
         Ok(())
@@ -77,6 +82,9 @@ pub enum RomControllerInitErr<R: RomReader> {
 pub enum ReadError {
     #[error("RAM address {addr} out of reach for this cartridge (max {max})")]
     NotEnoughRam { addr: u16, max: u16 },
+
+    #[error("Error with RomReader: {}", 0)]
+    Reader(Box<dyn std::error::Error>),
 }
 
 #[derive(Debug, Error)]
@@ -86,4 +94,12 @@ pub enum WriteError {
 
     #[error("Address is read only: 0x{:x}", .0)]
     ReadOnly(u16),
+
+    #[error("Error with RomReader: {}", 0)]
+    Reader(Box<dyn std::error::Error>),
+}
+
+/// Converts a bank index to an address within the ROM
+const fn bank_num_to_addr(num: usize) -> usize {
+    0x4000 * num
 }

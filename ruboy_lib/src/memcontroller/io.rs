@@ -183,6 +183,12 @@ pub enum IoWriteErr {}
 #[derive(Debug, Error)]
 pub enum IoReadErr {}
 
+impl Default for IoRegs {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IoRegs {
     pub fn new() -> Self {
         Self {
@@ -237,7 +243,7 @@ impl IoRegs {
             }
             0xFF80.. => panic!("Too high for I/O range"),
             _ => {
-                log::info!("I/O register not implemented for writing: 0x{:x}", addr);
+                log::debug!("I/O register not implemented for writing: 0x{:x}", addr);
             }
         };
 
@@ -266,7 +272,7 @@ impl IoRegs {
             0xFF4B => Ok(self.win_x),
             0xFF80.. => panic!("Too high for I/O range"),
             _ => {
-                log::info!(
+                log::debug!(
                     "I/O register not implemented for reading: 0x{:x}, returning 0x00",
                     addr
                 );
